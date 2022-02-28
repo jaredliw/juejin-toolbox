@@ -7,7 +7,7 @@ def pprint(mat):
     print(np.matrix(mat))
 
 
-min_map = [
+test_map = [
     [0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.1],
     [0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1],
     [0.1, 0.2, 0.1, 0.2, 0.1, 0.2, 0.1],
@@ -19,7 +19,7 @@ min_map = [
 # Game._Game__MAP_LENGTH = 3
 # Game._Game__MAP_WIDTH = 3
 
-g = Game(min_map, 11)
+g = Game(test_map, 11)
 pprint(g.game_map)
 print()
 commands = [
@@ -39,11 +39,6 @@ for c in commands:
     pprint(g.game_map)
     print()
 
-print(g.undo(1))
-# for s in [(2, 0, Direction.DOWN), (1, 1, Direction.DOWN), (0, 2, Direction.RIGHT)]:
-#     g.move(*s)
-#     print(np.matrix(g.game_map))
-#
-# print(g.is_success())
-# print(g.get_elements())
-# print(g.game_map[2][1])
+g.reset()
+pprint(g.game_map)
+assert g.game_map == test_map
