@@ -33,6 +33,7 @@ class Game:
         self.game_map = deepcopy(game_map)
         self.target = target
         self.__history = []
+        self.__actions = []
 
     @staticmethod
     def __calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
@@ -84,6 +85,7 @@ class Game:
         self.game_map[from_y][from_x], self.game_map[to_y][to_x] = 0.1, self.game_map[from_y][from_x]
         self.__elements.remove((from_x, from_y))
         self.__elements.add((to_x, to_y))
+        self.__actions.append(("move", from_x, from_y, to_x, to_y))
 
     def __join_numbers(self, from_x: int, to_x: int, y: int) -> Union[Tuple[int, int], None]:
         try:
@@ -92,12 +94,13 @@ class Game:
                     not self.__is_number(val2 := self.game_map[y][to_x]):
                 return None
 
-            self.game_map[y][from_x], self.game_map[y][to_x] = 0.1, self.__calc(val1, "&", val2)
+            self.game_map[y][from_x], self.game_map[y][to_x] = 0.1, (ans := self.__calc(val1, "&", val2))
         except IndexError:
             return None
 
         self.__elements.remove((from_x, y))
         self.__elements.add((to_x, y))
+        self.__actions.append(("join", val1, val2, ans, from_x, to_x, y))
         return to_x, y
 
     def __eval_numbers(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Union[Tuple[int, int], None]:
@@ -114,12 +117,13 @@ class Game:
                 val1, val2 = val2, val1
 
             self.game_map[y][val1_x], self.game_map[y][symbol_x], self.game_map[y][val2_x] \
-                = 0.1, self.__calc(val1, symbol, val2), 0.1
+                = 0.1, (ans := self.__calc(val1, symbol, val2)), 0.1
         except (IndexError, ArithmeticError):
             return None
 
         self.__elements.remove((val1_x, y))
         self.__elements.remove((val2_x, y))
+        self.__actions.append(("eval", val1, symbol, val2, ans, val1_x, symbol_x, val2_x))
         return symbol_x, y
 
     def __move_left_right(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
@@ -181,3 +185,19 @@ class Game:
     def undo(self, n: int) -> None:
         if not isinstance(n, int) or n < 0:
             raise ValueError("invalid 'n': not a positive integer")
+
+        for _ in range(n):
+            if len(self.__actions) == 0:
+                break
+
+            cmd, *args = self.__actions.pop()
+            match cmd:
+                case "move":
+                    from_x, from_y, to_x, to_y = args
+                    self.game_map[from_y][from_x], self.game_map[to_y][to_x] = self.game_map[to_y][to_x], 0.1
+                case "join":
+                    val1, val2, from_x, to_x,
+                case "eval":
+                    pass
+                case _:
+                    raise ValueError(f"unknown command: '{cmd}'")

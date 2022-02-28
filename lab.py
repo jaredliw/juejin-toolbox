@@ -22,7 +22,7 @@ min_map = [
 g = Game(min_map, 11)
 pprint(g.game_map)
 print()
-command = [
+commands = [
     [0, 6, Direction.UP],
     [0, 0, Direction.RIGHT],
     [2, 0, Direction.DOWN],
@@ -33,11 +33,13 @@ command = [
     [6, 0, Direction.LEFT]
 ]
 
-for c in command:
+for c in commands:
     print(c[2])
     print(g.move(*c))
     pprint(g.game_map)
     print()
+
+print(g.undo(1))
 # for s in [(2, 0, Direction.DOWN), (1, 1, Direction.DOWN), (0, 2, Direction.RIGHT)]:
 #     g.move(*s)
 #     print(np.matrix(g.game_map))
