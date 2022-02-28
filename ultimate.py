@@ -148,6 +148,7 @@ class Game:
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
 
+        self.__actions.append(None)  # Custom separator
         new_x, new_y = self.__move(x, y, direction)
 
         if direction in (Direction.LEFT, Direction.RIGHT):
@@ -161,6 +162,8 @@ class Game:
 
         if (x, y) != (new_x, new_y):
             self.__move_history.append((x, y, direction))
+        else:
+            self.__actions.pop()  # Pop none
         return new_x, new_y
 
     def __join_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
@@ -193,29 +196,34 @@ class Game:
     def reset(self) -> None:
         self.undo(len(self.__actions))
 
-    def undo(self, move_count: int = 1) -> None:  # todo n -> counting correctly
+    def undo(self, move_count: int = 1) -> None:
         if not isinstance(move_count, int) or move_count < 0:
             raise ValueError("invalid 'n': not a positive integer")
-        print(self.__actions)
-        while move_count:
+
+        for _ in range(move_count):
             if len(self.__actions) == 0:
                 break
 
-            cmd, *args = self.__actions.pop()
-            match cmd:
-                case "move":
-                    from_x, from_y, to_x, to_y = args
-                    self.game_map[from_y][from_x], self.game_map[to_y][to_x] = self.game_map[to_y][to_x], 0.1
+            while True:
+                item = self.__actions.pop()
+                if item is None:
+                    break
 
-                    move_count -= 1
-                    self.__move_history.pop()
-                case "join":
-                    val1, val2, from_x, to_x, y = args
-                    self.game_map[y][from_x], self.game_map[y][to_x] = val1, val2
-                case "eval":
-                    val1, symbol, val2, leftmost_x, rightmost_x, y = args
-                    self.game_map[y][leftmost_x], self.game_map[y][leftmost_x + 1], self.game_map[y][rightmost_x] \
-                        = val1, symbol, val2
-                case _:
-                    raise ValueError(f"unknown command: '{cmd}'")
-        print(self.__actions)
+                cmd, *args = item
+                match cmd:
+                    case "move":
+                        from_x, from_y, to_x, to_y = args
+                        self.game_map[from_y][from_x], self.game_map[to_y][to_x] = self.game_map[to_y][to_x], 0.1
+
+                        move_count -= 1
+                        self.__move_history.pop()
+                    case "join":
+                        val1, val2, from_x, to_x, y = args
+                        self.game_map[y][from_x], self.game_map[y][to_x] = val1, val2
+                    case "eval":
+                        val1, symbol, val2, leftmost_x, rightmost_x, y = args
+                        self.game_map[y][leftmost_x], self.game_map[y][leftmost_x + 1], self.game_map[y][rightmost_x] \
+                            = val1, symbol, val2
+                    case _:
+                        raise ValueError(f"unknown command: '{cmd}'")
+            self.__move_history.pop()
