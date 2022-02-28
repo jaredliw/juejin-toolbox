@@ -109,6 +109,10 @@ class Game:
                     not self.__is_number(val2 := self.game_map[y][val2_x]):
                 return None
 
+            if val1_x > val2_x:
+                val1_x, val2_x = val2_x, val1_x
+                val1, val2 = val2, val1
+
             self.game_map[y][val1_x], self.game_map[y][symbol_x], self.game_map[y][val2_x] \
                 = 0.1, self.__calc(val1, symbol, val2), 0.1
         except (IndexError, ArithmeticError):
@@ -177,4 +181,3 @@ class Game:
     def undo(self, n: int) -> None:
         if not isinstance(n, int) or n < 0:
             raise ValueError("invalid 'n': not a positive integer")
-
