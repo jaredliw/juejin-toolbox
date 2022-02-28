@@ -32,8 +32,8 @@ class Game:
 
         self.game_map = deepcopy(game_map)
         self.target = target
-        self.__move_history = []
-        self.__actions = []
+        self.__history = []
+        self.__full_history = []
 
     @staticmethod
     def __calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
@@ -83,17 +83,21 @@ class Game:
         self.game_map[from_y][from_x], self.game_map[to_y][to_x] = 0.1, self.game_map[from_y][from_x]
         self.__elements.remove((from_x, from_y))
         self.__elements.add((to_x, to_y))
-        self.__actions.append(("move", from_x, from_y, to_x, to_y))
+        self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     def __join_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:  # todo incorrect when undo()
         val1, val2 = self.game_map[y][from_x], self.game_map[y][to_x]
-        if val1 > val2:
+        swapped = False
+        if from_x > to_x:
             val1, val2 = val2, val1
+            swapped = True
+
         self.game_map[y][from_x], self.game_map[y][to_x] = 0.1, self.__calc(val1, 0.7, val2)
 
         self.__elements.remove((from_x, y))
-        self.__elements.add((to_x, y))
-        self.__actions.append(("join", val1, val2, from_x, to_x, y))
+        if swapped:
+            val1, val2 = val2, val1
+        self.__full_history.append(("join", val1, val2, from_x, to_x, y))
         return to_x, y
 
     def __eval_numbers(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Tuple[int, int]:
@@ -106,7 +110,7 @@ class Game:
 
         self.__elements.remove((val1_x, y))
         self.__elements.remove((val2_x, y))
-        self.__actions.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
+        self.__full_history.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
         return symbol_x, y
 
     def __move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
@@ -148,22 +152,23 @@ class Game:
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
 
-        self.__actions.append(None)  # Custom separator
+        self.__full_history.append(None)  # Custom separator
         new_x, new_y = self.__move(x, y, direction)
 
         if direction in (Direction.LEFT, Direction.RIGHT):
             plus_minus = add if direction == Direction.RIGHT else sub
-            if (join_res := self.__join_numbers_handler(x, plus_minus(x, 1), y)) is not None:
-                self.__move_history.append((x, y, direction))
+            if (join_res := self.__join_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
+                self.__history.append((new_x, new_y, direction))
                 return join_res
-            elif (val_res := self.__eval_numbers_handler(x, plus_minus(x, 1), plus_minus(x, 2), y)) is not None:
-                self.__move_history.append((x, y, direction))
+            elif (val_res := self.__eval_numbers_handler(new_x, plus_minus(new_x, 1), plus_minus(new_x, 2),
+                                                         new_y)) is not None:
+                self.__history.append((new_x, new_y, direction))
                 return val_res
 
         if (x, y) != (new_x, new_y):
-            self.__move_history.append((x, y, direction))
+            self.__history.append((x, y, direction))
         else:
-            self.__actions.pop()  # Pop none
+            self.__full_history.pop()  # Pop none
         return new_x, new_y
 
     def __join_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
@@ -191,21 +196,21 @@ class Game:
         return self.game_map[y][x] == self.target
 
     def get_history(self) -> List[Tuple[int, int, Direction]]:
-        return self.__move_history
+        return self.__history
 
     def reset(self) -> None:
-        self.undo(len(self.__actions))
+        self.undo(len(self.__full_history))
 
     def undo(self, move_count: int = 1) -> None:
         if not isinstance(move_count, int) or move_count < 0:
             raise ValueError("invalid 'n': not a positive integer")
 
         for _ in range(move_count):
-            if len(self.__actions) == 0:
+            if len(self.__full_history) == 0:
                 break
 
             while True:
-                item = self.__actions.pop()
+                item = self.__full_history.pop()
                 if item is None:
                     break
 
@@ -214,9 +219,6 @@ class Game:
                     case "move":
                         from_x, from_y, to_x, to_y = args
                         self.game_map[from_y][from_x], self.game_map[to_y][to_x] = self.game_map[to_y][to_x], 0.1
-
-                        move_count -= 1
-                        self.__move_history.pop()
                     case "join":
                         val1, val2, from_x, to_x, y = args
                         self.game_map[y][from_x], self.game_map[y][to_x] = val1, val2
@@ -226,4 +228,4 @@ class Game:
                             = val1, symbol, val2
                     case _:
                         raise ValueError(f"unknown command: '{cmd}'")
-            self.__move_history.pop()
+            self.__history.pop()
