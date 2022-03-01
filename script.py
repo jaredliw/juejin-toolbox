@@ -1,7 +1,7 @@
 from collections import deque
 from copy import deepcopy
 
-from ultimate import Direction, Game
+from puzzle import Direction, Puzzle
 
 # map_ = [
 #     [0.1,
@@ -29,7 +29,7 @@ min_map = [
 MAX_DEPTH = 8
 
 to_do = deque()
-to_do.append((Game(min_map, 30), 0))
+to_do.append((Puzzle(min_map, 30), 0))
 from time import time
 
 st = time()
@@ -37,7 +37,7 @@ count = 0
 while to_do:
     game, depth = to_do.popleft()
 
-    for x, y in game.get_elements():
+    for x, y in game.get_pieces():
         for direction in Direction:
             count += 1
             game_clone = deepcopy(game)
@@ -45,7 +45,7 @@ while to_do:
             moved_x, moved_y = game_clone.move(x, y, direction)
             if x == moved_x and y == moved_y:
                 continue
-            if game_clone.is_success():
+            if game_clone.is_solved():
                 success_game = game_clone
                 print(game_clone)
                 print(game_clone.game_map)

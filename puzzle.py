@@ -1,126 +1,307 @@
-from base64 import b64decode
-from itertools import chain, zip_longest
-from random import shuffle
-from time import time, sleep
-from typing import List, Literal, Tuple, Union
-
-from regex import search
-from requests import post
-
-VALID_OPERATIONS = ("+", "-", "*", "/", "&")
-URL = "https://juejin-game.bytedance.com/game/num-puzz/ugc/start"
+from copy import deepcopy, copy
+from enum import Enum
+from operator import add, sub
+from typing import List, Union, Tuple, Literal, Any, Set
 
 
-def calc(num1: int, sym: Literal["+", "-", "*", "/", "&"], num2: int) -> int:
-    if not isinstance(num1, int) or not isinstance(num2, int) or sym not in VALID_OPERATIONS:
-        raise TypeError(f"unsupported operand type(s) for {sym}: '{type(num1).__name__}' and '{type(num2).__name__}'")
-
-    if sym == "+":
-        return num1 + num2
-    elif sym == "-":
-        if num1 < num2:
-            raise ArithmeticError(f"'{num1} {sym} {num2}': {num1} is smaller than {num2}")
-        return num1 - num2
-    elif sym == "*":
-        return num1 * num2
-    elif sym == "/":
-        ans = num1 / num2
-        if not ans.is_integer():
-            raise ArithmeticError(f"'{num1} {sym} {num2}': {num1} is not divisible by {num2}")
-        return int(ans)
-    else:
-        return int(str(num1) + str(num2))
+class Direction(Enum):
+    LEFT = "L"
+    RIGHT = "R"
+    UP = "U"
+    DOWN = "D"
 
 
-def brute_force(target: int, nums: List[int], syms: List[Literal["+", "-", "*", "/", "&"]], timeout: int = 60) -> list:
-    if not all(map(lambda x: isinstance(x, int), nums)):
-        raise ValueError("'nums' should only be comprised of integers")
-    if not all(map(lambda x: x in VALID_OPERATIONS, syms)):
-        raise ValueError(f"values of 'syms' should be one of the following: {VALID_OPERATIONS}")
-    if not isinstance(target, int):
-        raise TypeError(f"'target' should be '{int.__name__}', not {type(target).__name__}")
+class Puzzle:
+    __MAP_LENGTH = 7
+    __MAP_WIDTH = 7
 
-    try:
-        start_time = time()
-        for _ in range(len(nums) - len(syms) - 1):
-            syms.append("&")
+    def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
+        # Parameter validation
+        if not len(puzzle) == self.__MAP_WIDTH or not all(map(lambda arr: len(arr) == self.__MAP_LENGTH, puzzle)):
+            raise ValueError(f"malformed puzzle, should be a {self.__MAP_LENGTH} by {self.__MAP_WIDTH} grid")
+        if not self.__is_number(target):
+            raise ValueError("invalid 'target'")
 
-        while True:
-            if time() - start_time > timeout:
-                raise TimeoutError("time limit exceeds")
-            shuffle(nums)
-            shuffle(syms)
-            exp = list(chain(*zip_longest(nums, syms)))[:-1]
+        self.__pieces = set()
+        for y, row in enumerate(puzzle):
+            for x, item in enumerate(row):
+                if not self.__is_valid(item):
+                    raise ValueError(f"invalid value '{item}' in puzzle")
 
-            precedence = list(range(1, len(syms) + 1))
-            shuffle(precedence)
+                if self.__is_piece(item):
+                    self.__pieces.add((x, y))
 
-            steps = []
-            flag = False
-            for n in range(1, len(syms) + 1):
-                loc = precedence.index(n)
-                precedence.pop(loc)
+        # Initialization
+        self.puzzle = deepcopy(puzzle)
+        self.target = target
+        self.__history = []  # Only storing `move` method calls (with their arguments) history
+        self.__full_history = []  # For inner use, storing every action (move/concat/eval) performed
 
-                loc *= 2
-                try:
-                    operands = [exp.pop(loc), exp.pop(loc), exp.pop(loc)]
-                    exp.insert(loc, calc(*operands))
-                    steps.append(" ".join(map(str, operands)))
-                except ArithmeticError:
-                    flag = True
+    # todo: implement __getitem__ and __setitem__
+    # todo: read-only puzzle
+
+    @staticmethod
+    def __calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
+        # No parameter validation here, assuming they are OK
+        match symbol:
+            case 0.3:  # +
+                return num1 + num2
+            case 0.4:  # -
+                if num1 < num2:
+                    raise ArithmeticError(f"could not subtract {num2} from {num1}")
+                return num1 - num2
+            case 0.5:  # *
+                return num1 * num2
+            case 0.6:  # /
+                if not (ans := num1 / num2).is_integer():
+                    raise ArithmeticError(f"{num1} is not divisible by {num2}")
+                return int(ans)
+            case 0.7:  # Self-defined operator 0.7 ('&') -> 3 & 7 = 37, 7 & 3 = 73
+                return int(str(num1) + str(num2))
+
+    @staticmethod
+    def __is_number(value: Any) -> bool:  # Refer to numbers in the puzzle, non-negative
+        return isinstance(value, int) and value >= 0
+
+    @staticmethod
+    def __is_symbol(value: Any) -> bool:  # Inherit the representation of +, -, *, / in Juejin API
+        return value in (0.3, 0.4, 0.5, 0.6)
+
+    @staticmethod
+    def __is_piece(value: Any) -> bool:  # Movable pieces in the puzzle
+        return Puzzle.__is_number(value) or Puzzle.__is_symbol(value)
+
+    @staticmethod
+    def __is_blank(value: Any) -> bool:
+        return value == 0.1
+
+    @staticmethod
+    def __is_obstacle(value: Any) -> bool:
+        return value == 0.2
+
+    @staticmethod
+    def __is_valid(value: Any) -> bool:  # Check if it is a valid value in our 2D puzzle map
+        return Puzzle.__is_piece(value) or Puzzle.__is_obstacle(value) or Puzzle.__is_blank(value)
+
+    def __move_element(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
+        # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
+        # Therefore, either from_x == to_x or from_y == to_y in order to be valid
+        # todo: optimize to remove redundant parameter(s)
+        # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
+        # `__move` method will find a legal (to_x, to_y) for this
+        self.puzzle[from_y][from_x], self.puzzle[to_y][to_x] = 0.1, self.puzzle[from_y][from_x]
+        self.__pieces.remove((from_x, from_y))
+        self.__pieces.add((to_x, to_y))
+        self.__full_history.append(("move", from_x, from_y, to_x, to_y))
+
+    def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:
+        # Concatenate two numbers, just like strings
+        # No parameter validation here
+        val1, val2 = self.puzzle[y][from_x], self.puzzle[y][to_x]
+        # Custom '&' operator does not obey the commutative law, i.e. 7 & 3 != 3 & 7
+        # In the puzzle, the result is evaluating from left to right
+        # E.g. 7, 3, swiping to the right -> 0.1, 73
+        #      7, 3, swiping to the left  -> 73, 0.1
+        # Note that we only swap the values, but not the indices; as the result has to be at (to_x, y)
+        swapped = False
+        if from_x > to_x:
+            val1, val2 = val2, val1
+            swapped = True
+
+        self.puzzle[y][from_x], self.puzzle[y][to_x] = 0.1, self.__calc(val1, 0.7, val2)
+
+        self.__pieces.remove((from_x, y))
+        # Swap again if we swapped them just now
+        # This is because val1 is originally at (from_x, y) and val2 is at (to_x, y)
+        # If we don't do this, `undo` method (see below) will yield an incorrect result when we undo this step
+        if swapped:
+            val1, val2 = val2, val1
+        self.__full_history.append(("concat", val1, val2, from_x, to_x, y))
+        return to_x, y
+
+    def __eval_numbers(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Tuple[int, int]:
+        # No parameter validation here
+        # Unlike the above, the result is always in the middle of three, i.e. (symbol_x, y)
+
+        # Make sure that the expression is evaluated from left to right
+        if val1_x > val2_x:
+            val1_x, val2_x = val2_x, val1_x
+        val1, symbol, val2 = self.puzzle[y][val1_x], self.puzzle[y][symbol_x], self.puzzle[y][val2_x]
+
+        # May cause ArithmeticError
+        self.puzzle[y][val1_x], self.puzzle[y][symbol_x], self.puzzle[y][val2_x] \
+            = 0.1, self.__calc(val1, symbol, val2), 0.1
+
+        self.__pieces.remove((val1_x, y))
+        self.__pieces.remove((val2_x, y))
+        self.__full_history.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
+        return symbol_x, y
+
+    def __move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
+        is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
+        is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
+        if is_increasing:
+            bound = self.__MAP_LENGTH if is_moving_horizontally else self.__MAP_WIDTH
+        else:
+            bound = -1
+        step = 1 if is_increasing else -1
+        plus_minus = add if is_increasing else sub
+
+        # todo: optimize
+        dest = x if is_moving_horizontally else y
+        dest_changed = False
+        for loc in range(plus_minus(dest, 1), bound, step):
+            val_at_dest = self.puzzle[y][loc] if is_moving_horizontally else self.puzzle[loc][x]
+            if self.__is_blank(val_at_dest):
+                dest = loc
+                dest_changed = True
+            else:
+                break
+
+        if not dest_changed:
+            return x, y
+        if is_moving_horizontally:
+            self.__move_element(x, y, dest, y)
+            return dest, y
+        self.__move_element(x, y, x, dest)
+        return x, dest
+
+    def move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
+        """Move a piece. A move that does not make a change to the map will be omitted.
+
+        :param x: x-coordinate of the piece
+        :type x: int
+        :param y: y-coordinate of the piece
+        :type y: int
+        :param direction: moving direction, either left, right, up or down
+        :type direction: Direction
+        :return: final (x, y) coordinate of the piece after moving
+        :rtype: Tuple[int, int]
+        :raises ValueError: index out of range or invalid `direction`
+        :raises TypeError: no pieces on the coordinate given
+        """
+        # Parameter validation
+        if not self.__is_number(x) or x >= self.__MAP_LENGTH:
+            raise IndexError("'x' is out of range")
+        if not self.__is_number(y) or y >= self.__MAP_WIDTH:
+            raise IndexError("'y' is out of range")
+        if not self.__is_piece(self.puzzle[y][x]):
+            raise TypeError(f"no movable pieces on location: ({x}, {y})")
+        if not isinstance(direction, Direction):
+            raise ValueError("invalid 'direction'")
+
+        # A move may yield:
+        #   - move
+        #   - move + eval
+        #   - move + concat
+        #   - eval
+        #   - concat
+        # We need something to separate them: None (as a header of each move)
+        self.__full_history.append(None)
+        new_x, new_y = self.__move(x, y, direction)
+
+        if direction in (Direction.LEFT, Direction.RIGHT):
+            plus_minus = add if direction == Direction.RIGHT else sub
+            if (concat_res := self.__concat_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
+                self.__history.append((new_x, new_y, direction))
+                return concat_res
+            elif (val_res := self.__eval_numbers_handler(new_x, plus_minus(new_x, 1), plus_minus(new_x, 2),
+                                                         new_y)) is not None:
+                self.__history.append((new_x, new_y, direction))
+                return val_res
+
+        if (x, y) != (new_x, new_y):  # This move makes a change
+            self.__history.append((x, y, direction))
+        else:  # Nothing get changed
+            self.__full_history.pop()  # Pop None that we appended earlier
+        return new_x, new_y
+
+    def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
+        # `from_x` is valid
+        # `to_x` = `from_x` (+ or -) 1 <-- check whether this is valid
+        # `y` is valid for sure
+        # value of (from_x, y) is a number
+        # value of (to_x, y) is a number? <-- check this
+        if to_x < 0 or to_x >= self.__MAP_LENGTH or not self.__is_number(self.puzzle[y][to_x]):
+            return None
+
+        return self.__concat_numbers(from_x, to_x, y)
+
+    def __eval_numbers_handler(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Union[None, Tuple[int, int]]:
+        # todo: remove redundant parameter(s), reduce the validation steps needed
+        if val1_x < 0 or val1_x >= self.__MAP_LENGTH or val2_x < 0 or val2_x >= self.__MAP_LENGTH or \
+                not self.__is_symbol(self.puzzle[y][symbol_x]) or \
+                not self.__is_number(self.puzzle[y][val2_x]):
+            return None
+
+        # todo: bug: unhandled ArithmeticError
+        return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
+
+    def get_pieces(self) -> Set[Tuple[int, int]]:
+        """Get all movable puzzle pieces in the puzzle map.
+
+        :return: a set of (x, y) coordinates
+        :rtype: Set[Tuple[int, int]]
+        """
+        return copy(self.__pieces)  # No need `deepcopy` here, since tuples are immutable
+
+    def is_solved(self) -> bool:
+        """Check whether the puzzle is solved.
+
+        :return: state of the puzzle
+        :rtype: bool
+        """
+        if len(elements := self.get_pieces()) != 1:
+            return False
+        x, y = elements.pop()
+        return self.puzzle[y][x] == self.target
+
+    def get_history(self) -> List[Tuple[int, int, Direction]]:
+        """Get history of moves.
+
+        :return: a list of moves that have been made
+        :rtype: List[Tuple[int, int, Direction]]
+        """
+        return copy(self.__history)  # No need `deepcopy` here, since tuples are immutable
+
+    def reset(self) -> None:
+        """Reset the puzzle to the initial, same as calling `undo` method infinite times.
+
+        :return: None
+        """
+        self.undo(len(self.__full_history))
+
+    def undo(self, move_count: int = 1) -> None:
+        """Return the state of the puzzle to `move_count` number of moves before.
+
+        :param move_count: the number of steps to undo, default to 1
+        :type move_count: int, non-negative
+        :return: None
+        :raises ValueError: invalid `move_count`
+        """
+        # Parameter check
+        if not isinstance(move_count, int) or move_count < 0:
+            raise ValueError(f"'move_count' should be a non-negative integer, not {move_count}")
+
+        for _ in range(move_count):  # Undo `move_count` times
+            if len(self.__full_history) == 0:  # `move_count` > len(history)
+                break
+
+            while True:
+                item = self.__full_history.pop()
+                if item is None:
                     break
-            if flag:
-                continue
 
-            if exp[0] == target:
-                return steps
-    except (TimeoutError, KeyboardInterrupt) as e:
-        raise e
-    except:
-        raise ValueError("puzzle not solvable") from None
-
-
-def fetch_data(authorization: str) -> dict:
-    headers = {
-        "authorization": authorization
-    }
-    params = {
-        "uid": search(r'(?<="userId":")\d*', str(b64decode(authorization.removeprefix("Bearer "))))[0],
-        "time": time() * 1000
-    }
-    return post(URL, headers=headers, params=params).json()["data"]
-
-
-def resolve_map(game_map: List[List[Union[int, float]]]) -> Tuple[List[int], List[Literal["+", "-", "*", "/"]]]:
-    nums = []
-    syms = []
-    for item in chain(*game_map):
-        if isinstance(item, int):
-            nums.append(item)
-        elif item == 0.3:
-            syms.append("+")
-        elif item == 0.4:
-            syms.append("-")
-        elif item == 0.5:
-            syms.append("*")
-        elif item == 0.6:
-            syms.append("/")
-    return nums, syms
-
-
-if __name__ == "__main__":
-    # Edit here
-    MY_TOKEN = "Bearer xxx"
-
-    last_level = None
-    while True:
-        data = fetch_data(MY_TOKEN)
-        level = data["round"]
-        if last_level != level:
-            print("Level", level)
-            print()
-            for step in brute_force(data["target"], *resolve_map(data["map"])):
-                print(step)
-            print()
-            last_level = level
-        sleep(3)
+                cmd, *args = item
+                match cmd:
+                    case "move":
+                        from_x, from_y, to_x, to_y = args
+                        self.puzzle[from_y][from_x], self.puzzle[to_y][to_x] = self.puzzle[to_y][to_x], 0.1
+                    case "concat":
+                        val1, val2, from_x, to_x, y = args
+                        self.puzzle[y][from_x], self.puzzle[y][to_x] = val1, val2
+                    case "eval":
+                        val1, symbol, val2, leftmost_x, rightmost_x, y = args
+                        self.puzzle[y][leftmost_x], self.puzzle[y][leftmost_x + 1], self.puzzle[y][rightmost_x] \
+                            = val1, symbol, val2
+            self.__history.pop()
