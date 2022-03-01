@@ -37,7 +37,12 @@ class ShuZiMiTi:
         self.__history = []  # Only storing `move` method calls (with their arguments) history
         self.__full_history = []  # For inner use, storing every action (move/concat/eval) performed
 
-    # todo: implement __getitem__ and __setitem__
+    def __getitem__(self, item):
+        return self.puzzle[item]  # Alias self.puzzle[y][x] -> self[y][x]
+
+    def __setitem__(self, key, value):
+        raise AttributeError("puzzle is read-only")  # Inhibit rewriting a row
+
     # todo: read-only puzzle
 
     @staticmethod
@@ -89,7 +94,7 @@ class ShuZiMiTi:
         # todo: optimize to remove redundant parameter(s)
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
         # `__move` method will find a legal (to_x, to_y) for this
-        self.puzzle[from_y][from_x], self.puzzle[to_y][to_x] = 0.1, self.puzzle[from_y][from_x]
+        self[from_y][from_x], self[to_y][to_x] = 0.1, self[from_y][from_x]
         self.__pieces.remove((from_x, from_y))
         self.__pieces.add((to_x, to_y))
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
@@ -97,7 +102,7 @@ class ShuZiMiTi:
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:
         # Concatenate two numbers, just like strings
         # No parameter validation here
-        val1, val2 = self.puzzle[y][from_x], self.puzzle[y][to_x]
+        val1, val2 = self[y][from_x], self[y][to_x]
         # Custom '&' operator does not obey the commutative law, i.e. 7 & 3 != 3 & 7
         # In the puzzle, the result is evaluating from left to right
         # E.g. 7, 3, swiping to the right -> 0.1, 73
@@ -108,7 +113,7 @@ class ShuZiMiTi:
             val1, val2 = val2, val1
             swapped = True
 
-        self.puzzle[y][from_x], self.puzzle[y][to_x] = 0.1, self.__calc(val1, 0.7, val2)
+        self[y][from_x], self[y][to_x] = 0.1, self.__calc(val1, 0.7, val2)
 
         self.__pieces.remove((from_x, y))
         # Swap again if we swapped them just now
@@ -126,10 +131,10 @@ class ShuZiMiTi:
         # Make sure that the expression is evaluated from left to right
         if val1_x > val2_x:
             val1_x, val2_x = val2_x, val1_x
-        val1, symbol, val2 = self.puzzle[y][val1_x], self.puzzle[y][symbol_x], self.puzzle[y][val2_x]
+        val1, symbol, val2 = self[y][val1_x], self[y][symbol_x], self[y][val2_x]
 
         # May cause ArithmeticError
-        self.puzzle[y][val1_x], self.puzzle[y][symbol_x], self.puzzle[y][val2_x] \
+        self[y][val1_x], self[y][symbol_x], self[y][val2_x] \
             = 0.1, self.__calc(val1, symbol, val2), 0.1
 
         self.__pieces.remove((val1_x, y))
@@ -151,7 +156,7 @@ class ShuZiMiTi:
         dest = x if is_moving_horizontally else y
         dest_changed = False
         for loc in range(plus_minus(dest, 1), bound, step):
-            val_at_dest = self.puzzle[y][loc] if is_moving_horizontally else self.puzzle[loc][x]
+            val_at_dest = self[y][loc] if is_moving_horizontally else self[loc][x]
             if self.__is_blank(val_at_dest):
                 dest = loc
                 dest_changed = True
@@ -185,7 +190,7 @@ class ShuZiMiTi:
             raise IndexError("'x' is out of range")
         if not self.__is_number(y) or y >= self.__PUZZLE_WIDTH:
             raise IndexError("'y' is out of range")
-        if not self.__is_piece(self.puzzle[y][x]):
+        if not self.__is_piece(self[y][x]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
@@ -222,7 +227,7 @@ class ShuZiMiTi:
         # `y` is valid for sure
         # value of (from_x, y) is a number
         # value of (to_x, y) is a number? <-- check this
-        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or not self.__is_number(self.puzzle[y][to_x]):
+        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or not self.__is_number(self[y][to_x]):
             return None
 
         return self.__concat_numbers(from_x, to_x, y)
@@ -230,8 +235,8 @@ class ShuZiMiTi:
     def __eval_numbers_handler(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Union[None, Tuple[int, int]]:
         # todo: remove redundant parameter(s), reduce the validation steps needed
         if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
-                not self.__is_symbol(self.puzzle[y][symbol_x]) or \
-                not self.__is_number(self.puzzle[y][val2_x]):
+                not self.__is_symbol(self[y][symbol_x]) or \
+                not self.__is_number(self[y][val2_x]):
             return None
 
         try:
@@ -256,7 +261,7 @@ class ShuZiMiTi:
         if len(elements := self.get_pieces()) != 1:
             return False
         x, y = elements.pop()
-        return self.puzzle[y][x] == self.target
+        return self[y][x] == self.target
 
     def get_history(self) -> List[Tuple[int, int, Direction]]:
         """Get history of moves.
@@ -298,12 +303,12 @@ class ShuZiMiTi:
                 match cmd:
                     case "move":
                         from_x, from_y, to_x, to_y = args
-                        self.puzzle[from_y][from_x], self.puzzle[to_y][to_x] = self.puzzle[to_y][to_x], 0.1
+                        self[from_y][from_x], self[to_y][to_x] = self[to_y][to_x], 0.1
                     case "concat":
                         val1, val2, from_x, to_x, y = args
-                        self.puzzle[y][from_x], self.puzzle[y][to_x] = val1, val2
+                        self[y][from_x], self[y][to_x] = val1, val2
                     case "eval":
                         val1, symbol, val2, leftmost_x, rightmost_x, y = args
-                        self.puzzle[y][leftmost_x], self.puzzle[y][leftmost_x + 1], self.puzzle[y][rightmost_x] \
+                        self[y][leftmost_x], self[y][leftmost_x + 1], self[y][rightmost_x] \
                             = val1, symbol, val2
             self.__history.pop()
