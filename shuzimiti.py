@@ -101,7 +101,6 @@ class ShuZiMiTi:
     def __move_element(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
-        # todo: optimize to remove redundant parameter(s)
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
         # `__move` method will find a legal (to_x, to_y) for this
         self[from_y][from_x], self[to_y][to_x] = 0.1, self[from_y][from_x]
@@ -231,12 +230,10 @@ class ShuZiMiTi:
         return new_x, new_y
 
     def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        # `from_x` is valid
-        # `to_x` = `from_x` (+ or -) 1 <-- check whether this is valid
-        # `y` is valid for sure
-        # value of (from_x, y) is a number
-        # value of (to_x, y) is a number? <-- check this
-        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or not self.__is_number(self[y][to_x]):
+        # `from_x` and `y` are valid for sure
+        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][from_x]) or \
+                not self.__is_number(self[y][to_x]):
             return None
 
         return self.__concat_numbers(from_x, to_x, y)
