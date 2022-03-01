@@ -32,18 +32,28 @@ class ShuZiMiTi:
                     self.__pieces.add((x, y))
 
         # Initialization
-        self.puzzle = deepcopy(puzzle)
+        self.__puzzle = deepcopy(puzzle)
         self.target = target
         self.__history = []  # Only storing `move` method calls (with their arguments) history
         self.__full_history = []  # For inner use, storing every action (move/concat/eval) performed
 
     def __getitem__(self, item):
-        return self.puzzle[item]  # Alias self.puzzle[y][x] -> self[y][x]
+        return self.__puzzle[item]  # Alias self.__puzzle[y][x] -> self[y][x]
 
     def __setitem__(self, key, value):
         raise AttributeError("puzzle is read-only")  # Inhibit rewriting a row
 
-    # todo: read-only puzzle
+    @property
+    def puzzle(self):
+        return deepcopy(self.__puzzle)  # For external use only; use `self.__puzzle` directly in this class
+
+    @puzzle.setter
+    def puzzle(self, value):
+        raise AttributeError("puzzle is read-only")
+
+    @puzzle.deleter
+    def puzzle(self):
+        raise AttributeError("puzzle is read-only")
 
     @staticmethod
     def __calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
