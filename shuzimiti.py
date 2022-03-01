@@ -11,14 +11,14 @@ class Direction(Enum):
     DOWN = "D"
 
 
-class Puzzle:
-    __MAP_LENGTH = 7
-    __MAP_WIDTH = 7
+class ShuZiMiTi:
+    __PUZZLE_LENGTH = 7
+    __PUZZLE_WIDTH = 7
 
     def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
         # Parameter validation
-        if not len(puzzle) == self.__MAP_WIDTH or not all(map(lambda arr: len(arr) == self.__MAP_LENGTH, puzzle)):
-            raise ValueError(f"malformed puzzle, should be a {self.__MAP_LENGTH} by {self.__MAP_WIDTH} grid")
+        if not len(puzzle) == self.__PUZZLE_WIDTH or not all(map(lambda arr: len(arr) == self.__PUZZLE_LENGTH, puzzle)):
+            raise ValueError(f"malformed puzzle, should be a {self.__PUZZLE_LENGTH} by {self.__PUZZLE_WIDTH} grid")
         if not self.__is_number(target):
             raise ValueError("invalid 'target'")
 
@@ -69,7 +69,7 @@ class Puzzle:
 
     @staticmethod
     def __is_piece(value: Any) -> bool:  # Movable pieces in the puzzle
-        return Puzzle.__is_number(value) or Puzzle.__is_symbol(value)
+        return ShuZiMiTi.__is_number(value) or ShuZiMiTi.__is_symbol(value)
 
     @staticmethod
     def __is_blank(value: Any) -> bool:
@@ -80,8 +80,8 @@ class Puzzle:
         return value == 0.2
 
     @staticmethod
-    def __is_valid(value: Any) -> bool:  # Check if it is a valid value in our 2D puzzle map
-        return Puzzle.__is_piece(value) or Puzzle.__is_obstacle(value) or Puzzle.__is_blank(value)
+    def __is_valid(value: Any) -> bool:  # Check if it is a valid value in the puzzle
+        return ShuZiMiTi.__is_piece(value) or ShuZiMiTi.__is_obstacle(value) or ShuZiMiTi.__is_blank(value)
 
     def __move_element(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
@@ -141,7 +141,7 @@ class Puzzle:
         is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
         is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
         if is_increasing:
-            bound = self.__MAP_LENGTH if is_moving_horizontally else self.__MAP_WIDTH
+            bound = self.__PUZZLE_LENGTH if is_moving_horizontally else self.__PUZZLE_WIDTH
         else:
             bound = -1
         step = 1 if is_increasing else -1
@@ -167,7 +167,7 @@ class Puzzle:
         return x, dest
 
     def move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
-        """Move a piece. A move that does not make a change to the map will be omitted.
+        """Move a piece. A move that does not make a change to the puzzle will be omitted.
 
         :param x: x-coordinate of the piece
         :type x: int
@@ -181,9 +181,9 @@ class Puzzle:
         :raises TypeError: no pieces on the coordinate given
         """
         # Parameter validation
-        if not self.__is_number(x) or x >= self.__MAP_LENGTH:
+        if not self.__is_number(x) or x >= self.__PUZZLE_LENGTH:
             raise IndexError("'x' is out of range")
-        if not self.__is_number(y) or y >= self.__MAP_WIDTH:
+        if not self.__is_number(y) or y >= self.__PUZZLE_WIDTH:
             raise IndexError("'y' is out of range")
         if not self.__is_piece(self.puzzle[y][x]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
@@ -222,23 +222,25 @@ class Puzzle:
         # `y` is valid for sure
         # value of (from_x, y) is a number
         # value of (to_x, y) is a number? <-- check this
-        if to_x < 0 or to_x >= self.__MAP_LENGTH or not self.__is_number(self.puzzle[y][to_x]):
+        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or not self.__is_number(self.puzzle[y][to_x]):
             return None
 
         return self.__concat_numbers(from_x, to_x, y)
 
     def __eval_numbers_handler(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Union[None, Tuple[int, int]]:
         # todo: remove redundant parameter(s), reduce the validation steps needed
-        if val1_x < 0 or val1_x >= self.__MAP_LENGTH or val2_x < 0 or val2_x >= self.__MAP_LENGTH or \
+        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
                 not self.__is_symbol(self.puzzle[y][symbol_x]) or \
                 not self.__is_number(self.puzzle[y][val2_x]):
             return None
 
-        # todo: bug: unhandled ArithmeticError
-        return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
+        try:
+            return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
+        except ArithmeticError:
+            return None
 
     def get_pieces(self) -> Set[Tuple[int, int]]:
-        """Get all movable puzzle pieces in the puzzle map.
+        """Get all movable puzzle pieces in the puzzle.
 
         :return: a set of (x, y) coordinates
         :rtype: Set[Tuple[int, int]]

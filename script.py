@@ -1,7 +1,7 @@
 from collections import deque
 from copy import deepcopy
 
-from puzzle import Direction, Puzzle
+from shuzimiti import Direction, ShuZiMiTi
 
 # map_ = [
 #     [0.1,
@@ -29,7 +29,7 @@ min_map = [
 MAX_DEPTH = 8
 
 to_do = deque()
-to_do.append((Puzzle(min_map, 30), 0))
+to_do.append((ShuZiMiTi(min_map, 30), 0))
 from time import time
 
 st = time()
