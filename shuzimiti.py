@@ -166,8 +166,8 @@ class ShuZiMiTi:
         dest = x if is_moving_horizontally else y
         dest_changed = False
         for loc in range(plus_minus(dest, 1), bound, step):
-            val_at_dest = self[y][loc] if is_moving_horizontally else self[loc][x]
-            if self.__is_blank(val_at_dest):
+            val_at_loc = self[y][loc] if is_moving_horizontally else self[loc][x]
+            if self.__is_blank(val_at_loc):
                 dest = loc
                 dest_changed = True
             else:
@@ -220,8 +220,7 @@ class ShuZiMiTi:
             if (concat_res := self.__concat_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
                 self.__history.append((new_x, new_y, direction))
                 return concat_res
-            elif (val_res := self.__eval_numbers_handler(new_x, plus_minus(new_x, 1), plus_minus(new_x, 2),
-                                                         new_y)) is not None:
+            elif (val_res := self.__eval_numbers_handler(plus_minus(new_x, 1), new_y)) is not None:
                 self.__history.append((new_x, new_y, direction))
                 return val_res
 
@@ -242,16 +241,18 @@ class ShuZiMiTi:
 
         return self.__concat_numbers(from_x, to_x, y)
 
-    def __eval_numbers_handler(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        # todo: remove redundant parameter(s), reduce the validation steps needed
+    def __eval_numbers_handler(self, symbol_x: int, y: int) -> Union[None, Tuple[int, int]]:
+        val1_x = symbol_x - 1
+        val2_x = symbol_x + 1
         if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][val1_x]) or \
                 not self.__is_symbol(self[y][symbol_x]) or \
                 not self.__is_number(self[y][val2_x]):
             return None
 
         try:
             return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
-        except ArithmeticError:
+        except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
             return None
 
     def get_pieces(self) -> Set[Tuple[int, int]]:
