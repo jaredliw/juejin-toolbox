@@ -227,8 +227,8 @@ class ShuZiMiTi:
 
         if (x, y) != (new_x, new_y):  # This move makes a change
             self.__history.append((x, y, direction))
-        else:  # Nothing get changed
-            self.__full_history.pop()  # Pop None that we appended earlier
+        else:  # Nothing got changed
+            self.__full_history.pop()  # Pop `None` that we appended earlier
         return new_x, new_y
 
     def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
@@ -289,12 +289,13 @@ class ShuZiMiTi:
         self.undo(len(self.__full_history))
 
     def restore_state_to(self, history: List[Tuple[int, int, Direction]]) -> None:
-        # Parameter check
-        # for record in history:
-        #     if not (isinstance(record, tuple) and isinstance(record[0], int) and isinstance(record[1], int) and
-        #             isinstance(record[2], Direction) and 0 <= record[0] < self.__PUZZLE_LENGTH and
-        #             0 <= record[1] <= self.__PUZZLE_WIDTH):
-        #         raise ValueError("malformed history")
+        # Parameter validation
+        for record in history:
+            if not (isinstance(record, tuple) and len(record) == 3 and
+                    isinstance(record[0], int) and isinstance(record[1], int) and
+                    isinstance(record[2], Direction) and 0 <= record[0] < self.__PUZZLE_LENGTH and
+                    0 <= record[1] <= self.__PUZZLE_WIDTH):
+                raise ValueError("malformed history")
 
         longest_common_prefix_length = None
         for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.__history, history)):
@@ -314,7 +315,7 @@ class ShuZiMiTi:
         :return: None
         :raises ValueError: invalid `move_count`
         """
-        # Parameter check
+        # Parameter validation
         if not isinstance(move_count, int) or move_count < 0:
             raise ValueError(f"'move_count' should be a non-negative integer, not {move_count}")
 
