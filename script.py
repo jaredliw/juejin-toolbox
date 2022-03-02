@@ -1,58 +1,62 @@
 from collections import deque
-from copy import deepcopy
+from copy import copy
+from time import time
 
 from shuzimiti import Direction, ShuZiMiTi
 
-# map_ = [
-#     [0.1,
-#     0.1, 0.2, 0.3, 0.2, 19, 0.1],
-#     [7, 0.1, 0.1, 0.6, 0.1, 0.1, 0.6],
-#     [0.1, 0.2, 0.1, 0.1, 3, 0.2, 0.1],
-#     [0.1, 0.1, 2, 0.1, 0.1, 0.1, 0.1],
-#     [0.1, 0.6, 0.1, 17, 0.2, 0.1, 5],
-#     [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
-#     [11, 0.1, 0.2, 0.1, 13, 0.1, 0.1]
-# ]
-# # aim: 11 + 19
-# target = 2
-# g = Game(map_)
 
-min_map = [
-    [0.1, 0.1, 0.2, 0.3, 0.2, 19, 0.1],
-    [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-    [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
-    [0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-    [0.1, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1],
-    [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
-    [11, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1]
-]
-MAX_DEPTH = 8
+def bfs(puzzle):
+    to_do = deque([[]])
 
-to_do = deque()
-to_do.append((ShuZiMiTi(min_map, 30), 0))
-from time import time
+    while to_do:
+        history = to_do.popleft()
+        puzzle.restore_state_to(history)
+        for x, y in puzzle.get_pieces():
+            for direction in Direction:
+                moved_x, moved_y = puzzle.move(x, y, direction)
+                if x == moved_x and y == moved_y:
+                    continue
+                if puzzle.is_solved():
+                    return
 
-st = time()
-count = 0
-while to_do:
-    game, depth = to_do.popleft()
+                new_history = copy(history)
+                new_history.append((x, y, direction))
+                to_do.append(new_history)
+                puzzle.undo()
 
-    for x, y in game.get_pieces():
-        for direction in Direction:
-            count += 1
-            game_clone = deepcopy(game)
 
-            moved_x, moved_y = game_clone.move(x, y, direction)
-            if x == moved_x and y == moved_y:
-                continue
-            if game_clone.is_solved():
-                success_game = game_clone
-                print(game_clone)
-                print(game_clone.game_map)
-                print(game_clone.get_history())
-                print(f"{count=}")
-                print(time() - st)
-                exit()
-            if depth + 1 > MAX_DEPTH:
-                continue
-            to_do.append((game_clone, depth + 1))
+if __name__ == "__main__":
+    from numpy import matrix
+
+
+    def pprint(arr):
+        print(matrix(arr))
+
+
+    test_map = [
+        [0.1, 0.1, 0.2, 0.3, 0.2, 19, 0.1],
+        [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+        [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
+        [0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+        [0.1, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1],
+        [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
+        [11, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1]
+    ]
+    test_puzzle = ShuZiMiTi(test_map, 30)
+
+    start_time = time()
+    bfs(test_puzzle)
+    end_time = time()
+
+    pprint(test_puzzle.puzzle)
+    answer = test_puzzle.get_history()
+    for args in answer:
+        print(*args)
+
+    print("Time taken:", end_time - start_time)
+
+    # Validate answer
+    new_puzzle = ShuZiMiTi(test_map, 30)
+    for args in answer:
+        new_puzzle.move(*args)
+    assert new_puzzle.is_solved()
