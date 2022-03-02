@@ -1,5 +1,6 @@
 from copy import deepcopy, copy
 from enum import Enum
+from itertools import zip_longest
 from operator import add, sub
 from typing import List, Union, Tuple, Literal, Any, Set
 
@@ -104,6 +105,7 @@ class ShuZiMiTi:
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
         # `__move` method will find a legal (to_x, to_y) for this
         self[from_y][from_x], self[to_y][to_x] = 0.1, self[from_y][from_x]
+
         self.__pieces.remove((from_x, from_y))
         self.__pieces.add((to_x, to_y))
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
@@ -217,10 +219,10 @@ class ShuZiMiTi:
         if direction in (Direction.LEFT, Direction.RIGHT):
             plus_minus = add if direction == Direction.RIGHT else sub
             if (concat_res := self.__concat_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
-                self.__history.append((new_x, new_y, direction))
+                self.__history.append((x, y, direction))
                 return concat_res
             elif (val_res := self.__eval_numbers_handler(plus_minus(new_x, 1), new_y)) is not None:
-                self.__history.append((new_x, new_y, direction))
+                self.__history.append((x, y, direction))
                 return val_res
 
         if (x, y) != (new_x, new_y):  # This move makes a change
@@ -286,6 +288,24 @@ class ShuZiMiTi:
         """
         self.undo(len(self.__full_history))
 
+    def restore_state_to(self, history: List[Tuple[int, int, Direction]]) -> None:
+        # Parameter check
+        # for record in history:
+        #     if not (isinstance(record, tuple) and isinstance(record[0], int) and isinstance(record[1], int) and
+        #             isinstance(record[2], Direction) and 0 <= record[0] < self.__PUZZLE_LENGTH and
+        #             0 <= record[1] <= self.__PUZZLE_WIDTH):
+        #         raise ValueError("malformed history")
+
+        longest_common_prefix_length = None
+        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.__history, history)):
+            if this != that:
+                break
+
+        if longest_common_prefix_length is not None:
+            self.undo(len(self.__history) - longest_common_prefix_length)
+            for args in history[longest_common_prefix_length:]:
+                self.move(*args)
+
     def undo(self, move_count: int = 1) -> None:
         """Return the state of the puzzle to `move_count` number of moves before.
 
@@ -312,11 +332,16 @@ class ShuZiMiTi:
                     case "move":
                         from_x, from_y, to_x, to_y = args
                         self[from_y][from_x], self[to_y][to_x] = self[to_y][to_x], 0.1
+                        self.__pieces.add((from_x, from_y))
+                        self.__pieces.remove((to_x, to_y))
                     case "concat":
                         val1, val2, from_x, to_x, y = args
                         self[y][from_x], self[y][to_x] = val1, val2
+                        self.__pieces.add((from_x, y))
                     case "eval":
                         val1, symbol, val2, leftmost_x, rightmost_x, y = args
                         self[y][leftmost_x], self[y][leftmost_x + 1], self[y][rightmost_x] \
                             = val1, symbol, val2
+                        self.__pieces.add((leftmost_x, y))
+                        self.__pieces.add((rightmost_x, y))
             self.__history.pop()
