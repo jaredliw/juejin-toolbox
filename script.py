@@ -7,6 +7,7 @@ from shuzimiti import Direction, ShuZiMiTi
 
 def bfs(puzzle):
     to_do = deque([[]])
+    states = [puzzle.get_pieces()]
 
     while to_do:
         history = to_do.popleft()
@@ -14,14 +15,17 @@ def bfs(puzzle):
         for x, y in puzzle.get_pieces():
             for direction in Direction:
                 moved_x, moved_y = puzzle.move(x, y, direction)
+                pieces = puzzle.get_pieces()
                 if x == moved_x and y == moved_y:
                     continue
                 if puzzle.is_solved():
                     return
 
-                new_history = copy(history)
-                new_history.append((x, y, direction))
-                to_do.append(new_history)
+                if pieces not in states:
+                    states.append(pieces)
+                    new_history = copy(history)
+                    new_history.append((x, y, direction))
+                    to_do.append(new_history)
                 puzzle.undo()
 
 
@@ -53,7 +57,7 @@ if __name__ == "__main__":
     for args in answer:
         print(*args)
 
-    print("Time taken:", end_time - start_time)
+    print("\nTime taken:", end_time - start_time)
 
     # Validate answer
     new_puzzle = ShuZiMiTi(test_map, 30)
