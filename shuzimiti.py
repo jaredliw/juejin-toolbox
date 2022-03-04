@@ -1,9 +1,9 @@
 from collections import defaultdict
-from copy import deepcopy, copy
+from copy import deepcopy
 from enum import Enum
 from itertools import zip_longest
 from operator import add, sub
-from typing import List, Union, Tuple, Literal, Any, Set, DefaultDict
+from typing import List, Union, Tuple, Literal, Any
 
 
 class Direction(Enum):
@@ -24,38 +24,26 @@ class ShuZiMiTi:
         if not self.__is_number(target):
             raise ValueError("invalid 'target'")
 
-        self.__pieces = defaultdict(set)
+        self.pieces = defaultdict(set)
         for y, row in enumerate(puzzle):
             for x, item in enumerate(row):
                 if not self.__is_valid(item):
                     raise ValueError(f"invalid value '{item}' in puzzle")
 
                 if self.__is_piece(item):
-                    self.__pieces[item].add((x, y))
+                    self.pieces[item].add((x, y))
 
         # Initialization
-        self.__puzzle = deepcopy(puzzle)
+        self.puzzle = deepcopy(puzzle)
         self.target = target
-        self.__history = []  # Only storing `move` method calls (with their arguments) history
+        self.history = []  # Only storing `move` method calls (with their arguments) history
         self.__full_history = []  # For inner use, storing every action (move/concat/eval) performed
 
     def __getitem__(self, item):
-        return self.__puzzle[item]  # Alias self.__puzzle[y][x] -> self[y][x]
+        return self.puzzle[item]  # Alias self.__puzzle[y][x] -> self[y][x]
 
     def __setitem__(self, key, value):
         raise AttributeError("puzzle is read-only")  # Inhibit rewriting a row
-
-    @property
-    def puzzle(self):
-        return deepcopy(self.__puzzle)  # For external use only; use `self.__puzzle` directly in this class
-
-    @puzzle.setter
-    def puzzle(self, value):
-        raise AttributeError("puzzle is read-only")
-
-    @puzzle.deleter
-    def puzzle(self):
-        raise AttributeError("puzzle is read-only")
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
@@ -111,8 +99,8 @@ class ShuZiMiTi:
         value = self[from_y][from_x]
         self[from_y][from_x], self[to_y][to_x] = 0.1, value
 
-        self.__pieces[value].remove((from_x, from_y))
-        self.__pieces[value].add((to_x, to_y))
+        self.pieces[value].remove((from_x, from_y))
+        self.pieces[value].add((to_x, to_y))
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:
@@ -137,9 +125,9 @@ class ShuZiMiTi:
         # If we don't do this, `undo` method (see below) will yield an incorrect result when we undo this step
         if swapped:
             val1, val2 = val2, val1
-        self.__pieces[val1].remove((from_x, y))
-        self.__pieces[val2].remove((to_x, y))
-        self.__pieces[ans].add((to_x, y))
+        self.pieces[val1].remove((from_x, y))
+        self.pieces[val2].remove((to_x, y))
+        self.pieces[ans].add((to_x, y))
         self.__full_history.append(("concat", val1, val2, from_x, to_x, y))
         return to_x, y
 
@@ -156,10 +144,10 @@ class ShuZiMiTi:
         ans = self.calc(val1, symbol, val2)
         self[y][val1_x], self[y][symbol_x], self[y][val2_x] = 0.1, ans, 0.1
 
-        self.__pieces[val1].remove((val1_x, y))
-        self.__pieces[symbol].remove((symbol_x, y))
-        self.__pieces[val2].remove((val2_x, y))
-        self.__pieces[ans].add((symbol_x, y))
+        self.pieces[val1].remove((val1_x, y))
+        self.pieces[symbol].remove((symbol_x, y))
+        self.pieces[val2].remove((val2_x, y))
+        self.pieces[ans].add((symbol_x, y))
         self.__full_history.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
         return symbol_x, y
 
@@ -226,17 +214,18 @@ class ShuZiMiTi:
         self.__full_history.append(None)
         new_x, new_y = self.__move(x, y, direction)
 
+        # todo: optimize
         if direction in (Direction.LEFT, Direction.RIGHT):
             plus_minus = add if direction == Direction.RIGHT else sub
             if (concat_res := self.__concat_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
-                self.__history.append((x, y, direction))
+                self.history.append((x, y, direction))
                 return concat_res
             elif (val_res := self.__eval_numbers_handler(plus_minus(new_x, 1), new_y)) is not None:
-                self.__history.append((x, y, direction))
+                self.history.append((x, y, direction))
                 return val_res
 
         if (x, y) != (new_x, new_y):  # This move makes a change
-            self.__history.append((x, y, direction))
+            self.history.append((x, y, direction))
         else:  # Nothing got changed
             self.__full_history.pop()  # Pop `None` that we appended earlier
         return new_x, new_y
@@ -264,32 +253,19 @@ class ShuZiMiTi:
         except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
             return None
 
-    def get_pieces(self) -> DefaultDict[Union[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7]], Set[Tuple[int, int]]]:
-        """Get all movable puzzle pieces in the puzzle.
-
-        :return: a set of (x, y) coordinates
-        :rtype: Set[Tuple[int, int]]
-        """
-        return deepcopy(self.__pieces)
-
     def is_solved(self) -> bool:
         """Check whether the puzzle is solved.
 
         :return: state of the puzzle
         :rtype: bool
         """
-        if len(elements := self.get_pieces()) != 1:
-            return False
-        x, y = elements.pop()
-        return self[y][x] == self.target
-
-    def get_history(self) -> List[Tuple[int, int, Direction]]:
-        """Get history of moves.
-
-        :return: a list of moves that have been made
-        :rtype: List[Tuple[int, int, Direction]]
-        """
-        return copy(self.__history)  # No need `deepcopy` here, since tuples are immutable
+        raise NotImplementedError
+        # todo
+        # if len(self.pieces) != 1:
+        #     return False
+        # x, y = self.pieces.pop()
+        # self.
+        # return self[y][x] == self.target
 
     def reset(self) -> None:
         """Reset the puzzle to the initial, same as calling `undo` method infinite times.
@@ -308,12 +284,12 @@ class ShuZiMiTi:
                 raise ValueError("malformed history")
 
         longest_common_prefix_length = None
-        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.__history, history)):
+        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.history, history)):
             if this != that:
                 break
 
         if longest_common_prefix_length is not None:
-            self.undo(len(self.__history) - longest_common_prefix_length)
+            self.undo(len(self.history) - longest_common_prefix_length)
             for args in history[longest_common_prefix_length:]:
                 self.move(*args)
 
@@ -345,24 +321,24 @@ class ShuZiMiTi:
                         val = self[to_y][to_x]
                         self[from_y][from_x], self[to_y][to_x] = val, 0.1
 
-                        self.__pieces[val].add((from_x, from_y))
-                        self.__pieces[val].remove((to_x, to_y))
+                        self.pieces[val].add((from_x, from_y))
+                        self.pieces[val].remove((to_x, to_y))
                     case "concat":
                         val1, val2, from_x, to_x, y = args
                         val_after = self[y][to_x]
                         self[y][from_x], self[y][to_x] = val1, val2
 
-                        self.__pieces[val_after].remove((to_x, y))
-                        self.__pieces[val1].add((from_x, y))
-                        self.__pieces[val2].add((to_x, y))
+                        self.pieces[val_after].remove((to_x, y))
+                        self.pieces[val1].add((from_x, y))
+                        self.pieces[val2].add((to_x, y))
                     case "eval":
                         val1, symbol, val2, leftmost_x, rightmost_x, y = args
                         val_after = self[y][leftmost_x + 1]
                         self[y][leftmost_x], self[y][leftmost_x + 1], self[y][rightmost_x] \
                             = val1, symbol, val2
 
-                        self.__pieces[val_after].remove((leftmost_x + 1, y))
-                        self.__pieces[val1].add((leftmost_x, y))
-                        self.__pieces[symbol].add((leftmost_x + 1, y))
-                        self.__pieces[val2].add((rightmost_x, y))
-            self.__history.pop()
+                        self.pieces[val_after].remove((leftmost_x + 1, y))
+                        self.pieces[val1].add((leftmost_x, y))
+                        self.pieces[symbol].add((leftmost_x + 1, y))
+                        self.pieces[val2].add((rightmost_x, y))
+            self.history.pop()
