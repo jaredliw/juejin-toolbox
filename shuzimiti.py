@@ -91,7 +91,7 @@ class ShuZiMiTi:
     def __is_valid(value: Any) -> bool:  # Check if it is a valid value in the puzzle
         return ShuZiMiTi.__is_piece(value) or ShuZiMiTi.__is_obstacle(value) or ShuZiMiTi.__is_blank(value)
 
-    def __move_element(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
+    def __move_piece(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
@@ -175,9 +175,9 @@ class ShuZiMiTi:
         if not dest_changed:
             return x, y
         if is_moving_horizontally:
-            self.__move_element(x, y, dest, y)
+            self.__move_piece(x, y, dest, y)
             return dest, y
-        self.__move_element(x, y, x, dest)
+        self.__move_piece(x, y, x, dest)
         return x, dest
 
     def move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
