@@ -5,10 +5,14 @@ from time import time, sleep
 from typing import List, Literal, Tuple, Union
 
 from regex import search
-from requests import post
+from requests import post, RequestException
 
 VALID_OPERATIONS = ("+", "-", "*", "/", "&")
 URL = "https://juejin-game.bytedance.com/game/num-puzz/ugc/start"
+
+
+class JuejinError(RequestException):
+    pass
 
 
 def calc(num1: int, sym: Literal["+", "-", "*", "/", "&"], num2: int) -> int:
@@ -85,10 +89,14 @@ def fetch_data(authorization: str) -> dict:
         "authorization": authorization
     }
     params = {
-        "uid": search(r'(?<="userId":")\d*', str(b64decode(authorization.removeprefix("Bearer "))))[0],
+        "uid": search(r'(?<="userId":")\d*', str(b64decode(authorization.removeprefix("Bearer ") + "==")))[0],
         "time": time() * 1000
     }
-    return post(URL, headers=headers, params=params).json()["data"]
+    response = post(URL, headers=headers, params=params).json()
+    try:
+        return response["data"]
+    except KeyError:
+        raise JuejinError(response["message"]) from None
 
 
 def resolve_map(game_map: List[List[Union[int, float]]]) -> Tuple[List[int], List[Literal["+", "-", "*", "/"]]]:
