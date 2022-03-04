@@ -57,7 +57,7 @@ class ShuZiMiTi:
         raise AttributeError("puzzle is read-only")
 
     @staticmethod
-    def __calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
+    def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
         # No parameter validation here, assuming they are OK
         match symbol:
             case 0.3:  # +
@@ -124,7 +124,7 @@ class ShuZiMiTi:
             val1, val2 = val2, val1
             swapped = True
 
-        self[y][from_x], self[y][to_x] = 0.1, self.__calc(val1, 0.7, val2)
+        self[y][from_x], self[y][to_x] = 0.1, self.calc(val1, 0.7, val2)
 
         self.__pieces.remove((from_x, y))
         # Swap again if we swapped them just now
@@ -146,7 +146,7 @@ class ShuZiMiTi:
 
         # May cause ArithmeticError
         self[y][val1_x], self[y][symbol_x], self[y][val2_x] \
-            = 0.1, self.__calc(val1, symbol, val2), 0.1
+            = 0.1, self.calc(val1, symbol, val2), 0.1
 
         self.__pieces.remove((val1_x, y))
         self.__pieces.remove((val2_x, y))
