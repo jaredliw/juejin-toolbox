@@ -58,7 +58,8 @@ class ShuZiMiTi:
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
-        # No parameter validation here, assuming they are OK
+        if not (ShuZiMiTi.__is_number(num1) and ShuZiMiTi.__is_symbol(symbol) and ShuZiMiTi.__is_number(num2)):
+            raise ValueError(f"{num1} {symbol} {num2}: invalid operation")
         match symbol:
             case 0.3:  # +
                 return num1 + num2
