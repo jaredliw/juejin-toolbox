@@ -1,8 +1,9 @@
+from collections import defaultdict
 from copy import deepcopy, copy
 from enum import Enum
 from itertools import zip_longest
 from operator import add, sub
-from typing import List, Union, Tuple, Literal, Any, Set
+from typing import List, Union, Tuple, Literal, Any, Set, DefaultDict
 
 
 class Direction(Enum):
@@ -23,14 +24,14 @@ class ShuZiMiTi:
         if not self.__is_number(target):
             raise ValueError("invalid 'target'")
 
-        self.__pieces = set()
+        self.__pieces = defaultdict(set)
         for y, row in enumerate(puzzle):
             for x, item in enumerate(row):
                 if not self.__is_valid(item):
                     raise ValueError(f"invalid value '{item}' in puzzle")
 
                 if self.__is_piece(item):
-                    self.__pieces.add((x, y))
+                    self.__pieces[item].add((x, y))
 
         # Initialization
         self.__puzzle = deepcopy(puzzle)
@@ -58,7 +59,9 @@ class ShuZiMiTi:
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
-        if not (ShuZiMiTi.__is_number(num1) and ShuZiMiTi.__is_symbol(symbol) and ShuZiMiTi.__is_number(num2)):
+        if not (ShuZiMiTi.__is_number(num1) and
+                (ShuZiMiTi.__is_symbol(symbol) or symbol == 0.7) and
+                ShuZiMiTi.__is_number(num2)):
             raise ValueError(f"{num1} {symbol} {num2}: invalid operation")
         match symbol:
             case 0.3:  # +
@@ -105,10 +108,11 @@ class ShuZiMiTi:
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
         # `__move` method will find a legal (to_x, to_y) for this
-        self[from_y][from_x], self[to_y][to_x] = 0.1, self[from_y][from_x]
+        value = self[from_y][from_x]
+        self[from_y][from_x], self[to_y][to_x] = 0.1, value
 
-        self.__pieces.remove((from_x, from_y))
-        self.__pieces.add((to_x, to_y))
+        self.__pieces[value].remove((from_x, from_y))
+        self.__pieces[value].add((to_x, to_y))
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:
@@ -125,14 +129,17 @@ class ShuZiMiTi:
             val1, val2 = val2, val1
             swapped = True
 
-        self[y][from_x], self[y][to_x] = 0.1, self.calc(val1, 0.7, val2)
+        ans = self.calc(val1, 0.7, val2)
+        self[y][from_x], self[y][to_x] = 0.1, ans
 
-        self.__pieces.remove((from_x, y))
         # Swap again if we swapped them just now
         # This is because val1 is originally at (from_x, y) and val2 is at (to_x, y)
         # If we don't do this, `undo` method (see below) will yield an incorrect result when we undo this step
         if swapped:
             val1, val2 = val2, val1
+        self.__pieces[val1].remove((from_x, y))
+        self.__pieces[val2].remove((to_x, y))
+        self.__pieces[ans].add((to_x, y))
         self.__full_history.append(("concat", val1, val2, from_x, to_x, y))
         return to_x, y
 
@@ -146,11 +153,13 @@ class ShuZiMiTi:
         val1, symbol, val2 = self[y][val1_x], self[y][symbol_x], self[y][val2_x]
 
         # May cause ArithmeticError
-        self[y][val1_x], self[y][symbol_x], self[y][val2_x] \
-            = 0.1, self.calc(val1, symbol, val2), 0.1
+        ans = self.calc(val1, symbol, val2)
+        self[y][val1_x], self[y][symbol_x], self[y][val2_x] = 0.1, ans, 0.1
 
-        self.__pieces.remove((val1_x, y))
-        self.__pieces.remove((val2_x, y))
+        self.__pieces[val1].remove((val1_x, y))
+        self.__pieces[symbol].remove((symbol_x, y))
+        self.__pieces[val2].remove((val2_x, y))
+        self.__pieces[ans].add((symbol_x, y))
         self.__full_history.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
         return symbol_x, y
 
@@ -255,13 +264,13 @@ class ShuZiMiTi:
         except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
             return None
 
-    def get_pieces(self) -> Set[Tuple[int, int]]:
+    def get_pieces(self) -> DefaultDict[Union[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7]], Set[Tuple[int, int]]]:
         """Get all movable puzzle pieces in the puzzle.
 
         :return: a set of (x, y) coordinates
         :rtype: Set[Tuple[int, int]]
         """
-        return copy(self.__pieces)  # No need `deepcopy` here, since tuples are immutable
+        return deepcopy(self.__pieces)
 
     def is_solved(self) -> bool:
         """Check whether the puzzle is solved.
@@ -333,17 +342,27 @@ class ShuZiMiTi:
                 match cmd:
                     case "move":
                         from_x, from_y, to_x, to_y = args
-                        self[from_y][from_x], self[to_y][to_x] = self[to_y][to_x], 0.1
-                        self.__pieces.add((from_x, from_y))
-                        self.__pieces.remove((to_x, to_y))
+                        val = self[to_y][to_x]
+                        self[from_y][from_x], self[to_y][to_x] = val, 0.1
+
+                        self.__pieces[val].add((from_x, from_y))
+                        self.__pieces[val].remove((to_x, to_y))
                     case "concat":
                         val1, val2, from_x, to_x, y = args
+                        val_after = self[y][to_x]
                         self[y][from_x], self[y][to_x] = val1, val2
-                        self.__pieces.add((from_x, y))
+
+                        self.__pieces[val_after].remove((to_x, y))
+                        self.__pieces[val1].add((from_x, y))
+                        self.__pieces[val2].add((to_x, y))
                     case "eval":
                         val1, symbol, val2, leftmost_x, rightmost_x, y = args
+                        val_after = self[y][leftmost_x + 1]
                         self[y][leftmost_x], self[y][leftmost_x + 1], self[y][rightmost_x] \
                             = val1, symbol, val2
-                        self.__pieces.add((leftmost_x, y))
-                        self.__pieces.add((rightmost_x, y))
+
+                        self.__pieces[val_after].remove((leftmost_x + 1, y))
+                        self.__pieces[val1].add((leftmost_x, y))
+                        self.__pieces[symbol].add((leftmost_x + 1, y))
+                        self.__pieces[val2].add((rightmost_x, y))
             self.__history.pop()
