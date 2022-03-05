@@ -180,6 +180,29 @@ class ShuZiMiTi:
         self.__move_piece(x, y, x, dest)
         return x, dest
 
+    def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
+        # `from_x` and `y` are valid for sure
+        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][from_x]) or \
+                not self.__is_number(self[y][to_x]):
+            return None
+
+        return self.__concat_numbers(from_x, to_x, y)
+
+    def __eval_numbers_handler(self, symbol_x: int, y: int) -> Union[None, Tuple[int, int]]:
+        val1_x = symbol_x - 1
+        val2_x = symbol_x + 1
+        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][val1_x]) or \
+                not self.__is_symbol(self[y][symbol_x]) or \
+                not self.__is_number(self[y][val2_x]):
+            return None
+
+        try:
+            return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
+        except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
+            return None
+
     def move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
         """Move a piece. A move that does not make a change to the puzzle will be omitted.
 
@@ -229,29 +252,6 @@ class ShuZiMiTi:
         else:  # Nothing got changed
             self.__full_history.pop()  # Pop `None` that we appended earlier
         return new_x, new_y
-
-    def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        # `from_x` and `y` are valid for sure
-        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
-                not self.__is_number(self[y][from_x]) or \
-                not self.__is_number(self[y][to_x]):
-            return None
-
-        return self.__concat_numbers(from_x, to_x, y)
-
-    def __eval_numbers_handler(self, symbol_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        val1_x = symbol_x - 1
-        val2_x = symbol_x + 1
-        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
-                not self.__is_number(self[y][val1_x]) or \
-                not self.__is_symbol(self[y][symbol_x]) or \
-                not self.__is_number(self[y][val2_x]):
-            return None
-
-        try:
-            return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
-        except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
-            return None
 
     def is_solved(self) -> bool:
         """Check whether the puzzle is solved.
