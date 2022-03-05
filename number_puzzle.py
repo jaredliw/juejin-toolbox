@@ -14,8 +14,8 @@ class Direction(Enum):
 
 
 class NumberPuzzle:
-    __PUZZLE_LENGTH = 7
-    __PUZZLE_WIDTH = 7
+    PUZZLE_LENGTH = 7
+    PUZZLE_WIDTH = 7
 
     def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
         # Parameter validation
