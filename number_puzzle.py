@@ -13,7 +13,7 @@ class Direction(Enum):
     DOWN = "D"
 
 
-class ShuZiMiTi:
+class NumberPuzzle:
     __PUZZLE_LENGTH = 7
     __PUZZLE_WIDTH = 7
 
@@ -47,9 +47,9 @@ class ShuZiMiTi:
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
-        if not (ShuZiMiTi.__is_number(num1) and
-                (ShuZiMiTi.__is_symbol(symbol) or symbol == 0.7) and
-                ShuZiMiTi.__is_number(num2)):
+        if not (NumberPuzzle.__is_number(num1) and
+                (NumberPuzzle.__is_symbol(symbol) or symbol == 0.7) and
+                NumberPuzzle.__is_number(num2)):
             raise ValueError(f"{num1} {symbol} {num2}: invalid operation")
         match symbol:
             case 0.3:  # +
@@ -77,7 +77,7 @@ class ShuZiMiTi:
 
     @staticmethod
     def __is_piece(value: Any) -> bool:  # Movable pieces in the puzzle
-        return ShuZiMiTi.__is_number(value) or ShuZiMiTi.__is_symbol(value)
+        return NumberPuzzle.__is_number(value) or NumberPuzzle.__is_symbol(value)
 
     @staticmethod
     def __is_blank(value: Any) -> bool:
@@ -89,7 +89,7 @@ class ShuZiMiTi:
 
     @staticmethod
     def __is_valid(value: Any) -> bool:  # Check if it is a valid value in the puzzle
-        return ShuZiMiTi.__is_piece(value) or ShuZiMiTi.__is_obstacle(value) or ShuZiMiTi.__is_blank(value)
+        return NumberPuzzle.__is_piece(value) or NumberPuzzle.__is_obstacle(value) or NumberPuzzle.__is_blank(value)
 
     def __move_piece(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
