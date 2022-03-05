@@ -104,17 +104,19 @@ class ShuZiMiTi:
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[int, int]:
-        # Concatenate two numbers, just like strings
-        # No parameter validation here
-        val1, val2 = self[y][from_x], self[y][to_x]
+        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][from_x]) or \
+                not self.__is_number(self[y][to_x]):
+            raise ValueError("invalid operation")
+
+        val1, val2 = self[y][from_x], self[y][to_x]  # Concatenate two numbers, just like strings
         # Custom '&' operator does not obey the commutative law, i.e. 7 & 3 != 3 & 7
-        # In the puzzle, the result is evaluating from left to right
+        # Result is evaluating from left to right
         # E.g. 7, 3, swiping to the right -> 0.1, 73
         #      7, 3, swiping to the left  -> 73, 0.1
-        # Note that we only swap the values, but not the indices; as the result has to be at (to_x, y)
         swapped = False
         if from_x > to_x:
-            val1, val2 = val2, val1
+            val1, val2 = val2, val1  # Only swap the values, but not the indices; as the result has to be at (to_x, y)
             swapped = True
 
         ans = self.calc(val1, 0.7, val2)
@@ -131,17 +133,24 @@ class ShuZiMiTi:
         self.__full_history.append(("concat", val1, val2, from_x, to_x, y))
         return to_x, y
 
-    def __eval_numbers(self, val1_x: int, symbol_x: int, val2_x: int, y: int) -> Tuple[int, int]:
-        # No parameter validation here
-        # Unlike the above, the result is always in the middle of three, i.e. (symbol_x, y)
+    def __eval_numbers(self, symbol_x: int, y: int) -> Tuple[int, int]:
+        val1_x = symbol_x - 1
+        val2_x = symbol_x + 1
+        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
+                not self.__is_number(self[y][val1_x]) or \
+                not self.__is_symbol(self[y][symbol_x]) or \
+                not self.__is_number(self[y][val2_x]):
+            raise ValueError("invalid operation")
 
         # Make sure that the expression is evaluated from left to right
         if val1_x > val2_x:
             val1_x, val2_x = val2_x, val1_x
         val1, symbol, val2 = self[y][val1_x], self[y][symbol_x], self[y][val2_x]
 
-        # May cause ArithmeticError
-        ans = self.calc(val1, symbol, val2)
+        try:
+            ans = self.calc(val1, symbol, val2)
+        except ArithmeticError:
+            raise ValueError("invalid operation")
         self[y][val1_x], self[y][symbol_x], self[y][val2_x] = 0.1, ans, 0.1
 
         self.pieces[val1].remove((val1_x, y))
@@ -173,35 +182,13 @@ class ShuZiMiTi:
                 break
 
         if not dest_changed:
-            return x, y
+            raise ValueError("Invalid operation")
         if is_moving_horizontally:
             self.__move_piece(x, y, dest, y)
             return dest, y
-        self.__move_piece(x, y, x, dest)
-        return x, dest
-
-    def __concat_numbers_handler(self, from_x: int, to_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        # `from_x` and `y` are valid for sure
-        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
-                not self.__is_number(self[y][from_x]) or \
-                not self.__is_number(self[y][to_x]):
-            return None
-
-        return self.__concat_numbers(from_x, to_x, y)
-
-    def __eval_numbers_handler(self, symbol_x: int, y: int) -> Union[None, Tuple[int, int]]:
-        val1_x = symbol_x - 1
-        val2_x = symbol_x + 1
-        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
-                not self.__is_number(self[y][val1_x]) or \
-                not self.__is_symbol(self[y][symbol_x]) or \
-                not self.__is_number(self[y][val2_x]):
-            return None
-
-        try:
-            return self.__eval_numbers(val1_x, symbol_x, val2_x, y)
-        except ArithmeticError:  # divided by 0, not divisible, subtract from a number that is larger than itself
-            return None
+        else:
+            self.__move_piece(x, y, x, dest)
+            return x, dest
 
     def move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
         """Move a piece. A move that does not make a change to the puzzle will be omitted.
@@ -227,6 +214,7 @@ class ShuZiMiTi:
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
 
+        original_x, original_y = x, y
         # A move may yield:
         #   - move
         #   - move + eval
@@ -235,23 +223,27 @@ class ShuZiMiTi:
         #   - concat
         # We need something to separate them: None (as a header of each move)
         self.__full_history.append(None)
-        new_x, new_y = self.__move(x, y, direction)
+        try:
+            x, y = self.__move(x, y, direction)
+        except ValueError:
+            pass
 
-        # todo: optimize
         if direction in (Direction.LEFT, Direction.RIGHT):
             plus_minus = add if direction == Direction.RIGHT else sub
-            if (concat_res := self.__concat_numbers_handler(new_x, plus_minus(new_x, 1), new_y)) is not None:
-                self.history.append((x, y, direction))
-                return concat_res
-            elif (val_res := self.__eval_numbers_handler(plus_minus(new_x, 1), new_y)) is not None:
-                self.history.append((x, y, direction))
-                return val_res
+            try:
+                x, y = self.__concat_numbers(x, plus_minus(x, 1), y)
+            except ValueError:
+                pass
+            try:
+                x, y = self.__eval_numbers(plus_minus(x, 1), y)
+            except ValueError:
+                pass
 
-        if (x, y) != (new_x, new_y):  # This move makes a change
-            self.history.append((x, y, direction))
-        else:  # Nothing got changed
-            self.__full_history.pop()  # Pop `None` that we appended earlier
-        return new_x, new_y
+        if original_x == x and original_y == y:  # if no change
+            self.__full_history.pop()  # Pop `None`
+        else:
+            self.history.append((original_x, original_y, direction))
+        return x, y
 
     def is_solved(self) -> bool:
         """Check whether the puzzle is solved.
