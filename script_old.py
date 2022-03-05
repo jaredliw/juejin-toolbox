@@ -1,10 +1,10 @@
 from base64 import b64decode
 from itertools import chain, zip_longest
 from random import shuffle
+from re import search
 from time import time, sleep
 from typing import List, Literal, Tuple, Union
 
-from regex import search
 from requests import post, RequestException
 
 VALID_OPERATIONS = ("+", "-", "*", "/", "&")
