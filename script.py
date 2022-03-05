@@ -2,47 +2,28 @@ from collections import deque
 from copy import copy
 from itertools import chain
 
-from shuzimiti import Direction, ShuZiMiTi
+from shuzimiti import Direction
 
 
 def bfs(puzzle, val1, symbol, val2):
-    count = 0
-
-    def count_values():
-        return len(puzzle.pieces[val1]), len(puzzle.pieces[symbol]), len(puzzle.pieces[val2]), len(puzzle.pieces[ans])
-
     def is_step_completed():
-        after_counts = count_values()
-        # ans check
-        if after_counts[3] != initial_counts[3] + 1:
+        if operands is None:
             return False
-        # symbol check
-        if symbol != 0.7 and after_counts[1] != initial_counts[1] - 1:
-            return False
-        # vals check
-        if val1 == val2:
-            if after_counts[0] != initial_counts[0] - 2:
-                return False
+        elif operands[1] in (0.3, 0.5):
+            return operands == (val1, symbol, val2) or operands == (val2, symbol, val1)
         else:
-            if after_counts[0] != initial_counts[0] - 1 or \
-                    after_counts[2] != initial_counts[2] - 1:
-                return False
-        return True
+            return operands == (val1, symbol, val2)
 
-    def flatten_2d(arr):
-        return chain(*arr)
-
-    ans = ShuZiMiTi.calc(val1, symbol, val2)
-    initial_counts = count_values()
+    count = 0
     to_do = deque([copy(puzzle.history)])
 
     while to_do:
         history = to_do.popleft()
         puzzle.restore_state_to(history)
-        for x, y in list(flatten_2d(puzzle.pieces.values())):
+        for x, y in list(chain(*puzzle.pieces.values())):
             for direction in Direction:
                 count += 1
-                moved_x, moved_y = puzzle.move(x, y, direction)
+                (moved_x, moved_y), operands = puzzle.move(x, y, direction)
                 if len(history) > 0 and moved_x == history[-1][0] and moved_y == history[-1][1]:
                     puzzle.undo()
                     continue
