@@ -39,10 +39,13 @@ def bfs(puzzle, val1, symbol, val2):
     while to_do:
         history = to_do.popleft()
         puzzle.restore_state_to(history)
-        for x, y in flatten_2d(puzzle.pieces.values()):
+        for x, y in list(flatten_2d(puzzle.pieces.values())):
             for direction in Direction:
                 count += 1
                 moved_x, moved_y = puzzle.move(x, y, direction)
+                if len(history) > 0 and moved_x == history[-1][0] and moved_y == history[-1][1]:
+                    puzzle.undo()
+                    continue
                 if x == moved_x and y == moved_y:
                     continue
                 if is_step_completed():
