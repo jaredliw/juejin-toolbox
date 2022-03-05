@@ -19,8 +19,8 @@ class NumberPuzzle:
 
     def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
         # Parameter validation
-        if not len(puzzle) == self.__PUZZLE_WIDTH or not all(map(lambda arr: len(arr) == self.__PUZZLE_LENGTH, puzzle)):
-            raise ValueError(f"malformed puzzle, should be a {self.__PUZZLE_LENGTH} by {self.__PUZZLE_WIDTH} grid")
+        if not len(puzzle) == self.PUZZLE_WIDTH or not all(map(lambda arr: len(arr) == self.PUZZLE_LENGTH, puzzle)):
+            raise ValueError(f"malformed puzzle, should be a {self.PUZZLE_LENGTH} by {self.PUZZLE_WIDTH} grid")
         if not self.__is_number(target):
             raise ValueError("invalid 'target'")
 
@@ -105,7 +105,7 @@ class NumberPuzzle:
 
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
         # Concatenate two numbers, just like strings
-        if to_x < 0 or to_x >= self.__PUZZLE_LENGTH or \
+        if to_x < 0 or to_x >= self.PUZZLE_LENGTH or \
                 not self.__is_number(self[y][from_x]) or \
                 not self.__is_number(self[y][to_x]):
             raise ValueError("invalid operation")
@@ -129,7 +129,7 @@ class NumberPuzzle:
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6], int]]:
         val1_x = symbol_x - 1
         val2_x = symbol_x + 1
-        if val1_x < 0 or val1_x >= self.__PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.__PUZZLE_LENGTH or \
+        if val1_x < 0 or val1_x >= self.PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.PUZZLE_LENGTH or \
                 not self.__is_number(self[y][val1_x]) or \
                 not self.__is_symbol(self[y][symbol_x]) or \
                 not self.__is_number(self[y][val2_x]):
@@ -157,7 +157,7 @@ class NumberPuzzle:
         is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
         is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
         if is_increasing:
-            bound = self.__PUZZLE_LENGTH if is_moving_horizontally else self.__PUZZLE_WIDTH
+            bound = self.PUZZLE_LENGTH if is_moving_horizontally else self.PUZZLE_WIDTH
         else:
             bound = -1
         step = 1 if is_increasing else -1
@@ -199,9 +199,9 @@ class NumberPuzzle:
         :raises TypeError: no pieces on the coordinate given
         """
         # Parameter validation
-        if not self.__is_number(x) or x >= self.__PUZZLE_LENGTH:
+        if not self.__is_number(x) or x >= self.PUZZLE_LENGTH:
             raise IndexError("'x' is out of range")
-        if not self.__is_number(y) or y >= self.__PUZZLE_WIDTH:
+        if not self.__is_number(y) or y >= self.PUZZLE_WIDTH:
             raise IndexError("'y' is out of range")
         if not self.__is_piece(self[y][x]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
@@ -266,8 +266,8 @@ class NumberPuzzle:
         for record in history:
             if not (isinstance(record, tuple) and len(record) == 3 and
                     isinstance(record[0], int) and isinstance(record[1], int) and
-                    isinstance(record[2], Direction) and 0 <= record[0] < self.__PUZZLE_LENGTH and
-                    0 <= record[1] <= self.__PUZZLE_WIDTH):
+                    isinstance(record[2], Direction) and 0 <= record[0] < self.PUZZLE_LENGTH and
+                    0 <= record[1] <= self.PUZZLE_WIDTH):
                 raise ValueError("malformed history")
 
         longest_common_prefix_length = None
