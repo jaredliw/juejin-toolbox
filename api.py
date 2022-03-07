@@ -23,10 +23,13 @@ def fetch_data(authorization: str) -> dict:
     # token is base64 encoded, UID is in it
     # Be aware of padding error
     decoded_token = str(b64decode(authorization.removeprefix("Bearer ") + "=="))  # extra '=' will be omitted
+    search_result = search(r'(?<="userId":")\d*', decoded_token)  # Search for UID in token
+    if search_result is None:
+        raise ValueError("invalid token")
     response = post(URL, headers={
         "authorization": authorization
     }, params={
-        "uid": search(r'(?<="userId":")\d*', decoded_token)[0],  # Search for UID in token
+        "uid": search_result[0],
         "time": time() * 1000  # Millisecond timestamp
     }).json()
     try:
