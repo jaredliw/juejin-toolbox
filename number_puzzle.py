@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Iterable
 from copy import deepcopy
 from enum import Enum
 from itertools import zip_longest
@@ -14,26 +15,39 @@ class Direction(Enum):
 
 
 class NumberPuzzle:
-    PUZZLE_LENGTH = 7
-    PUZZLE_WIDTH = 7
-
     def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
         # Parameter validation
-        if not len(puzzle) == self.PUZZLE_WIDTH or not all(map(lambda arr: len(arr) == self.PUZZLE_LENGTH, puzzle)):
-            raise ValueError(f"malformed puzzle, should be a {self.PUZZLE_LENGTH} by {self.PUZZLE_WIDTH} grid")
-        if not self.__is_number(target):
+        if not self.is_number(target):
             raise ValueError("invalid 'target'")
+        if not isinstance(puzzle, Iterable):
+            raise TypeError("malformed puzzle")
 
         self.pieces = defaultdict(set)
+        has_piece = False
+        first_row_width = None
         for y, row in enumerate(puzzle):
+            if not isinstance(row, Iterable):
+                raise TypeError("malformed puzzle")
+
             for x, item in enumerate(row):
-                if not self.__is_valid(item):
+                if not self.is_valid_value(item):
                     raise ValueError(f"invalid value '{item}' in puzzle")
 
-                if self.__is_piece(item):
+                if self.is_piece(item):
+                    has_piece = True
                     self.pieces[item].add((x, y))
 
+            if first_row_width is None:
+                first_row_width = len(row)
+            elif len(row) != first_row_width:
+                raise TypeError("malformed puzzle")
+
+        if not has_piece:
+            raise ValueError("no pieces in the puzzle")
+
         # Initialization
+        self.LENGTH = len(puzzle[0])
+        self.WIDTH = len(puzzle)
         self.puzzle = deepcopy(puzzle)
         self.target = target
         self.history = []  # Only storing `move` method calls (with their arguments) history
@@ -47,9 +61,9 @@ class NumberPuzzle:
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
-        if not (NumberPuzzle.__is_number(num1) and
-                (NumberPuzzle.__is_symbol(symbol) or symbol == 0.7) and
-                NumberPuzzle.__is_number(num2)):
+        if not (NumberPuzzle.is_number(num1) and
+                (NumberPuzzle.is_symbol(symbol) or symbol == 0.7) and
+                NumberPuzzle.is_number(num2)):
             raise ValueError(f"{num1} {symbol} {num2}: invalid operation")
         match symbol:
             case 0.3:  # +
@@ -68,28 +82,28 @@ class NumberPuzzle:
                 return int(str(num1) + str(num2))
 
     @staticmethod
-    def __is_number(value: Any) -> bool:  # Refer to numbers in the puzzle, non-negative
+    def is_number(value: Any) -> bool:  # Refer to numbers in the puzzle, non-negative
         return isinstance(value, int) and value >= 0
 
     @staticmethod
-    def __is_symbol(value: Any) -> bool:  # Inherit the representation of +, -, *, / in Juejin API
+    def is_symbol(value: Any) -> bool:  # Inherit the representation of +, -, *, / in Juejin API
         return value in (0.3, 0.4, 0.5, 0.6)
 
     @staticmethod
-    def __is_piece(value: Any) -> bool:  # Movable pieces in the puzzle
-        return NumberPuzzle.__is_number(value) or NumberPuzzle.__is_symbol(value)
+    def is_piece(value: Any) -> bool:  # Movable pieces in the puzzle
+        return NumberPuzzle.is_number(value) or NumberPuzzle.is_symbol(value)
 
     @staticmethod
-    def __is_blank(value: Any) -> bool:
+    def is_blank(value: Any) -> bool:
         return value == 0.1
 
     @staticmethod
-    def __is_obstacle(value: Any) -> bool:
+    def is_obstacle(value: Any) -> bool:
         return value == 0.2
 
     @staticmethod
-    def __is_valid(value: Any) -> bool:  # Check if it is a valid value in the puzzle
-        return NumberPuzzle.__is_piece(value) or NumberPuzzle.__is_obstacle(value) or NumberPuzzle.__is_blank(value)
+    def is_valid_value(value: Any) -> bool:  # Check if it is a valid value in the puzzle
+        return NumberPuzzle.is_piece(value) or NumberPuzzle.is_obstacle(value) or NumberPuzzle.is_blank(value)
 
     def __move_piece(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
@@ -105,9 +119,9 @@ class NumberPuzzle:
 
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
         # Concatenate two numbers, just like strings
-        if to_x < 0 or to_x >= self.PUZZLE_LENGTH or \
-                not self.__is_number(self[y][from_x]) or \
-                not self.__is_number(self[y][to_x]):
+        if to_x < 0 or to_x >= self.LENGTH or \
+                not self.is_number(self[y][from_x]) or \
+                not self.is_number(self[y][to_x]):
             raise ValueError("invalid operation")
 
         val1, val2 = self[y][from_x], self[y][to_x]
@@ -129,10 +143,10 @@ class NumberPuzzle:
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6], int]]:
         val1_x = symbol_x - 1
         val2_x = symbol_x + 1
-        if val1_x < 0 or val1_x >= self.PUZZLE_LENGTH or val2_x < 0 or val2_x >= self.PUZZLE_LENGTH or \
-                not self.__is_number(self[y][val1_x]) or \
-                not self.__is_symbol(self[y][symbol_x]) or \
-                not self.__is_number(self[y][val2_x]):
+        if val1_x < 0 or val1_x >= self.LENGTH or val2_x < 0 or val2_x >= self.LENGTH or \
+                not self.is_number(self[y][val1_x]) or \
+                not self.is_symbol(self[y][symbol_x]) or \
+                not self.is_number(self[y][val2_x]):
             raise ValueError("invalid operation")
 
         # Make sure that the expression is evaluated from left to right
@@ -157,7 +171,7 @@ class NumberPuzzle:
         is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
         is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
         if is_increasing:
-            bound = self.PUZZLE_LENGTH if is_moving_horizontally else self.PUZZLE_WIDTH
+            bound = self.LENGTH if is_moving_horizontally else self.WIDTH
         else:
             bound = -1
         step = 1 if is_increasing else -1
@@ -168,7 +182,7 @@ class NumberPuzzle:
         dest_changed = False
         for loc in range(plus_minus(dest, 1), bound, step):
             val_at_loc = self[y][loc] if is_moving_horizontally else self[loc][x]
-            if self.__is_blank(val_at_loc):
+            if self.is_blank(val_at_loc):
                 dest = loc
                 dest_changed = True
             else:
@@ -199,11 +213,11 @@ class NumberPuzzle:
         :raises TypeError: no pieces on the coordinate given
         """
         # Parameter validation
-        if not self.__is_number(x) or x >= self.PUZZLE_LENGTH:
+        if not self.is_number(x) or x >= self.LENGTH:
             raise IndexError("'x' is out of range")
-        if not self.__is_number(y) or y >= self.PUZZLE_WIDTH:
+        if not self.is_number(y) or y >= self.WIDTH:
             raise IndexError("'y' is out of range")
-        if not self.__is_piece(self[y][x]):
+        if not self.is_piece(self[y][x]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
@@ -266,8 +280,8 @@ class NumberPuzzle:
         for record in history:
             if not (isinstance(record, tuple) and len(record) == 3 and
                     isinstance(record[0], int) and isinstance(record[1], int) and
-                    isinstance(record[2], Direction) and 0 <= record[0] < self.PUZZLE_LENGTH and
-                    0 <= record[1] <= self.PUZZLE_WIDTH):
+                    isinstance(record[2], Direction) and 0 <= record[0] < self.LENGTH and
+                    0 <= record[1] <= self.WIDTH):
                 raise ValueError("malformed history")
 
         longest_common_prefix_length = None
