@@ -1,8 +1,6 @@
 from collections import deque
 from copy import copy
-from itertools import chain, zip_longest
-from random import shuffle
-from time import time
+from itertools import chain
 from typing import List, Literal, Generator, Tuple
 
 from number_puzzle import Direction, NumberPuzzle
@@ -66,54 +64,6 @@ def find_valid_calculations(puzzle: NumberPuzzle) \
         elif NumberPuzzle.is_symbol(piece):
             symbols.extend([piece] * len(coordinates))
     return _inner(numbers, symbols, puzzle.target)
-
-
-def brute_force(target: int, nums: List[int], syms: List[Literal[0.3, 0.4, 0.5, 0.6]], timeout: int = 60) -> list:
-    if not all(map(lambda x: isinstance(x, int), nums)):
-        raise ValueError("'nums' should only be comprised of integers")
-    if not all(map(lambda x: x in (0.3, 0.4, 0.5, 0.6), syms)):
-        raise ValueError(f"'syms' contains invalid symbol")
-    if not isinstance(target, int):
-        raise TypeError(f"'target' should be '{int.__name__}', not {type(target).__name__}")
-
-    try:
-        start_time = time()
-        for _ in range(len(nums) - len(syms) - 1):
-            syms.append(0.7)
-
-        while True:
-            if time() - start_time > timeout:
-                raise TimeoutError("time limit exceeds")
-            shuffle(nums)
-            shuffle(syms)
-            exp = list(chain(*zip_longest(nums, syms)))[:-1]
-
-            precedence = list(range(1, len(syms) + 1))
-            shuffle(precedence)
-
-            steps = []
-            flag = False
-            for n in range(1, len(syms) + 1):
-                loc = precedence.index(n)
-                precedence.pop(loc)
-
-                loc *= 2
-                try:
-                    operands = (exp.pop(loc), exp.pop(loc), exp.pop(loc))
-                    exp.insert(loc, NumberPuzzle.calc(*operands))
-                    steps.append(operands)
-                except ArithmeticError:
-                    flag = True
-                    break
-            if flag:
-                continue
-
-            if exp[0] == target:
-                return steps
-    except (TimeoutError, KeyboardInterrupt) as e:
-        raise e
-    except:
-        raise ValueError("puzzle not solvable") from None
 
 
 def bfs(puzzle, val1, symbol, val2, state=1):
