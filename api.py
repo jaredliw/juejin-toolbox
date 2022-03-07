@@ -26,11 +26,12 @@ def fetch_data(authorization: str) -> dict:
     search_result = search(r'(?<="userId":")\d*', decoded_token)  # Search for UID in token
     if search_result is None:
         raise ValueError("invalid token")
+
     response = post(URL, headers={
         "authorization": authorization
     }, params={
         "uid": search_result[0],
-        "time": time() * 1000  # Millisecond timestamp
+        "time": int(time() * 1000)  # Millisecond timestamp
     }).json()
     try:
         return response["data"]
