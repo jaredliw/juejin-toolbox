@@ -1,0 +1,56 @@
+from api import fetch_data
+from number_puzzle import NumberPuzzle
+from solve import find_valid_calculations
+
+PPRINT_GRID_LEFT_RIGHT_PADDING = 1
+FLOAT_TO_SYMBOL = {
+    0.3: "+",
+    0.4: "-",
+    0.5: "*",
+    0.6: "/",
+    0.7: "&"
+}
+
+
+def pprint_puzzle(puzzle: NumberPuzzle) -> None:
+    """Pretty Juejin Number Puzzle.
+
+    :param puzzle: A puzzle
+    :type puzzle: NumberPuzzle
+    :return: None
+    """
+    if not isinstance(puzzle, NumberPuzzle):
+        raise TypeError(f"{puzzle} is not a {type(NumberPuzzle).__name__}")
+
+    def _format_piece(item):
+        match item:
+            case 0.1:
+                return ""
+            case 0.2:
+                return "\u2588" * (max_cell_width - 2 * PPRINT_GRID_LEFT_RIGHT_PADDING)  # a solid black block
+            case 0.3 | 0.4 | 0.5 | 0.6:
+                return FLOAT_TO_SYMBOL[item]
+            case _:
+                return str(item)
+
+    max_cell_width = max(map(lambda piece: len(str(piece)) if isinstance(piece, int) else -1, puzzle.pieces.keys()))
+    max_cell_width += 2 * PPRINT_GRID_LEFT_RIGHT_PADDING
+
+    for row in puzzle.puzzle:
+        print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
+        print("|" + "|".join(_format_piece(item).center(max_cell_width) for item in row) + "|")
+    print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
+
+
+if __name__ == "__main__":
+    MY_TOKEN = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsInNvdXJjZSI6Imp1ZWppbiJ9.eyJleHBpcmVBdCI6MTY0ODQzOTE4MiwidXNlcklkIjoiMTY3NTQzNjc2NjAyMTIwIiwiaWF0IjoxNjQ1ODQ3MTgyLCJleHAiOjE2NDg0MzkxODJ9.0tVlqX2DjFQv5t6POvg9aOMgnKyWE6T0itAzlRap1DDds4OgoiOAceKboOCVfC8MlW9QJMBxL2eDfaS2zpwjpLjH6VMtaTScv40JECnK6zfOjWVO4NNu7w98lO4XsWwS8upAjPf7W666JxfdEc2YGf1dSaMYLmhNzXrxTXZRHc8R3Yb4ULNoswbp9zxC5HIDjw0ud2kZS2K3QwqT03r_vxmOvfLfpLyVA2sPhX9SpqmFR1KmpK56o9HwGF5kOjlPGvIRQRVwOsJTKsjdIgID8KxsvFDOf5ZSMEDoY2QjH3g3ntmtGi6M6XlPvcJWG33r5Dkv8d_5ZXUneSVLbu4c5g"
+    data = fetch_data(MY_TOKEN)
+
+    np = NumberPuzzle(data["map"], data["target"])
+    print("Level", data["round"])
+    pprint_puzzle(np)
+    print()
+
+    print("Calculations:")
+    for num1, symbol, num2 in next(find_valid_calculations(np)):
+        print(num1, FLOAT_TO_SYMBOL[symbol], num2)
