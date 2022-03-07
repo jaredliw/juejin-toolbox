@@ -1,8 +1,119 @@
 from collections import deque
 from copy import copy
-from itertools import chain
+from itertools import chain, zip_longest
+from random import shuffle
+from time import time
+from typing import List, Literal, Generator, Tuple
 
-from number_puzzle import Direction
+from number_puzzle import Direction, NumberPuzzle
+
+
+def find_valid_calculations(puzzle: NumberPuzzle) \
+        -> Generator[List[Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int]], None, None]:
+    """Find all valid calculations that are able to solve the given puzzle.
+
+    :param puzzle: A puzzle
+    :type puzzle: NumberPuzzle
+    :return: A generator, yield a valid calculation a time
+    :rtype: Generator[List[Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int]], None, None]
+    """
+
+    def _inner(_numbers, _symbols, target, history=None):
+        if history is None:
+            history = []
+        if len(_numbers) == 1 and len(_symbols) == 0 and _numbers[0] == target:
+            yield history
+            return
+
+        _symbols.extend([0.7] * (len(_numbers) - len(_symbols) - 1))
+        for symbol in (0.3, 0.4, 0.5, 0.6, 0.7):
+            if symbol not in _symbols:
+                continue
+
+            symbols_copied = copy(_symbols)
+            symbols_copied.remove(symbol)
+            for idx, num1 in enumerate(_numbers[:-1]):
+                for num2 in _numbers[idx + 1:]:
+                    for _ in range(2):
+                        try:
+                            result = NumberPuzzle.calc(num1, symbol, num2)
+                        except ArithmeticError:
+                            pass
+                        else:
+                            numbers_copied = copy(_numbers)
+                            numbers_copied.remove(num1)
+                            numbers_copied.remove(num2)
+                            numbers_copied.append(result)
+
+                            history_copied = copy(history)
+                            history_copied.append((num1, symbol, num2))
+
+                            yield from _inner(numbers_copied, symbols_copied, target, history_copied)
+
+                        if symbol in (0.4, 0.6, 0.7) and num1 != num2:  # -, / and & do not obey commutative law
+                            num1, num2 = num2, num1
+                        else:
+                            break
+
+    if not isinstance(puzzle, NumberPuzzle):
+        raise TypeError(f"{puzzle} is not a {type(NumberPuzzle).__name__}")
+
+    numbers = []
+    symbols = []
+    for piece, coordinates in puzzle.pieces.items():
+        if NumberPuzzle.is_number(piece):
+            numbers.extend([piece] * len(coordinates))
+        elif NumberPuzzle.is_symbol(piece):
+            symbols.extend([piece] * len(coordinates))
+    return _inner(numbers, symbols, puzzle.target)
+
+
+def brute_force(target: int, nums: List[int], syms: List[Literal[0.3, 0.4, 0.5, 0.6]], timeout: int = 60) -> list:
+    if not all(map(lambda x: isinstance(x, int), nums)):
+        raise ValueError("'nums' should only be comprised of integers")
+    if not all(map(lambda x: x in (0.3, 0.4, 0.5, 0.6), syms)):
+        raise ValueError(f"'syms' contains invalid symbol")
+    if not isinstance(target, int):
+        raise TypeError(f"'target' should be '{int.__name__}', not {type(target).__name__}")
+
+    try:
+        start_time = time()
+        for _ in range(len(nums) - len(syms) - 1):
+            syms.append(0.7)
+
+        while True:
+            if time() - start_time > timeout:
+                raise TimeoutError("time limit exceeds")
+            shuffle(nums)
+            shuffle(syms)
+            exp = list(chain(*zip_longest(nums, syms)))[:-1]
+
+            precedence = list(range(1, len(syms) + 1))
+            shuffle(precedence)
+
+            steps = []
+            flag = False
+            for n in range(1, len(syms) + 1):
+                loc = precedence.index(n)
+                precedence.pop(loc)
+
+                loc *= 2
+                try:
+                    operands = (exp.pop(loc), exp.pop(loc), exp.pop(loc))
+                    exp.insert(loc, NumberPuzzle.calc(*operands))
+                    steps.append(operands)
+                except ArithmeticError:
+                    flag = True
+                    break
+            if flag:
+                continue
+
+            if exp[0] == target:
+                return steps
+    except (TimeoutError, KeyboardInterrupt) as e:
+        raise e
+    except:
+        raise ValueError("puzzle not solvable") from None
 
 
 def bfs(puzzle, val1, symbol, val2, state=1):
