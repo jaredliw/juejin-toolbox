@@ -223,7 +223,7 @@ class NumberPuzzle:
         if x < 0 or y < 0:
             raise ValueError(f"coordinates should be non-negative, not ({x}, {y})")
         if not self.is_piece(self[x, y]):
-            raise TypeError(f"no movable pieces on location: ({x}, {y})")
+            raise TypeError(f"no movable pieces on ({x}, {y})")
         if not isinstance(direction, Direction):
             raise ValueError("invalid direction")
 
