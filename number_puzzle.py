@@ -18,8 +18,8 @@ class NumberPuzzle:
     def __init__(self, puzzle: List[List[int | float]], target: int):
         # Parameter validation
         if not self.is_number(target):
-            raise ValueError("invalid 'target'")
-        if not isinstance(puzzle, Iterable):
+            raise ValueError(f"target should be a non-negative integer, not {target}")
+        if not isinstance(puzzle, list):
             raise TypeError("malformed puzzle")
 
         self.pieces = defaultdict(set)
@@ -68,10 +68,8 @@ class NumberPuzzle:
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
-        if not (NumberPuzzle.is_number(num1) and
-                (NumberPuzzle.is_symbol(symbol) or symbol == 0.7) and
-                NumberPuzzle.is_number(num2)):
-            raise ValueError(f"{num1} {symbol} {num2}: invalid operation")
+        if not (NumberPuzzle.is_number(num1) and NumberPuzzle.is_number(num2)):
+            raise ValueError(f"could not perform operation on: {num1} and {num2}")
         match symbol:
             case 0.3:  # +
                 return num1 + num2
@@ -87,6 +85,8 @@ class NumberPuzzle:
                 return int(ans)
             case 0.7:  # Self-defined operator 0.7 ('&') -> 3 & 7 = 37, 7 & 3 = 73
                 return int(str(num1) + str(num2))
+            case _:
+                raise ValueError(f"unrecognized operator: {symbol}")
 
     @staticmethod
     def is_number(value: Any) -> bool:  # Refer to numbers in the puzzle, non-negative
@@ -220,14 +220,12 @@ class NumberPuzzle:
         :raises TypeError: no pieces on the coordinate given
         """
         # Parameter validation
-        if not self.is_number(x) or x >= self.LENGTH:
-            raise IndexError("'x' is out of range")
-        if not self.is_number(y) or y >= self.WIDTH:
-            raise IndexError("'y' is out of range")
+        if x < 0 or y < 0:
+            raise ValueError(f"coordinates should be non-negative, not ({x}, {y})")
         if not self.is_piece(self[x, y]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
         if not isinstance(direction, Direction):
-            raise ValueError("invalid 'direction'")
+            raise ValueError("invalid direction")
 
         original_x, original_y = x, y
         # A move may yield:
@@ -283,36 +281,23 @@ class NumberPuzzle:
         self.undo(len(self.__full_history))
 
     def restore_state_to(self, history: List[Tuple[int, int, Direction]]) -> None:
-        # Parameter validation
-        for record in history:
-            if not (isinstance(record, tuple) and len(record) == 3 and
-                    isinstance(record[0], int) and isinstance(record[1], int) and
-                    isinstance(record[2], Direction) and 0 <= record[0] < self.LENGTH and
-                    0 <= record[1] <= self.WIDTH):
-                raise ValueError("malformed history")
-
-        longest_common_prefix_length = None
+        longest_common_prefix_length = 0
         for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.history, history)):
             if this != that:
                 break
 
-        if longest_common_prefix_length is not None:
-            self.undo(len(self.history) - longest_common_prefix_length)
-            for args in history[longest_common_prefix_length:]:
-                self.move(*args)
+        self.undo(len(self.history) - longest_common_prefix_length)
+        for args in history[longest_common_prefix_length:]:
+            self.move(*args)
 
     def undo(self, move_count: int = 1) -> None:
         """Return the state of the puzzle to `move_count` number of moves before.
 
         :param move_count: the number of steps to undo, default to 1
-        :type move_count: int, non-negative
+        :type move_count: int
         :return: None
         :raises ValueError: invalid `move_count`
         """
-        # Parameter validation
-        if not isinstance(move_count, int) or move_count < 0:
-            raise ValueError(f"'move_count' should be a non-negative integer, not {move_count}")
-
         for _ in range(move_count):  # Undo `move_count` times
             if len(self.__full_history) == 0:  # `move_count` > len(history)
                 break
