@@ -56,10 +56,15 @@ class NumberPuzzle:
         self.__full_history = []  # For inner use, storing every action (move/concat/eval) performed
 
     def __getitem__(self, item):
-        return self.puzzle[item]  # Alias self.__puzzle[y][x] -> self[y][x]
+        if isinstance(item, tuple):
+            return self.puzzle[item[1]][item[0]]  # Alias self.puzzle[y][x] -> self[x, y]
+        return self.puzzle[item]
 
     def __setitem__(self, key, value):
-        raise AttributeError("puzzle is read-only")  # Inhibit rewriting a row
+        if isinstance(key, tuple):
+            self.puzzle[key[1]][key[0]] = value  # Alias self.puzzle[y][x] -> self[x, y]
+        else:
+            self.puzzle[key] = value
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
@@ -112,8 +117,8 @@ class NumberPuzzle:
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
         # Still no parameter validation here, as we are simply 'teleporting' a piece from one place to another
         # `__move` method will find a legal (to_x, to_y) for this
-        value = self[from_y][from_x]
-        self[from_y][from_x], self[to_y][to_x] = 0.1, value
+        value = self[from_x, from_y]
+        self[from_x, from_y], self[to_x, to_y] = 0.1, value
 
         self.pieces[value].remove((from_x, from_y))
         self.pieces[value].add((to_x, to_y))
@@ -122,18 +127,18 @@ class NumberPuzzle:
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
         # Concatenate two numbers, just like strings
         if to_x < 0 or to_x >= self.LENGTH or \
-                not self.is_number(self[y][from_x]) or \
-                not self.is_number(self[y][to_x]):
+                not self.is_number(self[from_x, y]) or \
+                not self.is_number(self[to_x, y]):
             raise ValueError("invalid operation")
 
-        val1, val2 = self[y][from_x], self[y][to_x]
+        val1, val2 = self[from_x, y], self[to_x, y]
         # Custom '&' operator does not obey the commutative law, i.e. 7 & 3 != 3 & 7
         # Result is evaluating from left to right
         # E.g. 7, 3, swiping to the right -> 0.1, 73
         #      7, 3, swiping to the left  -> 73, 0.1
         # Only swap the values, but not the indices; as the result has to be at (to_x, y)
         ans = self.calc(val2, 0.7, val1) if from_x > to_x else self.calc(val1, 0.7, val2)
-        self[y][from_x], self[y][to_x] = 0.1, ans
+        self[from_x, y], self[to_x, y] = 0.1, ans
 
         self.pieces[val1].remove((from_x, y))
         self.pieces[val2].remove((to_x, y))
@@ -147,20 +152,20 @@ class NumberPuzzle:
         val2_x = symbol_x + 1
         if val1_x < 0 or val1_x >= self.LENGTH or val2_x < 0 or val2_x >= self.LENGTH or \
                 not self.is_number(self[y][val1_x]) or \
-                not self.is_symbol(self[y][symbol_x]) or \
+                not self.is_symbol(self[symbol_x, y]) or \
                 not self.is_number(self[y][val2_x]):
             raise ValueError("invalid operation")
 
         # Make sure that the expression is evaluated from left to right
         if val1_x > val2_x:
             val1_x, val2_x = val2_x, val1_x
-        val1, symbol, val2 = self[y][val1_x], self[y][symbol_x], self[y][val2_x]
+        val1, symbol, val2 = self[y][val1_x], self[symbol_x, y], self[y][val2_x]
 
         try:
             ans = self.calc(val1, symbol, val2)
         except ArithmeticError:
             raise ValueError("invalid operation")
-        self[y][val1_x], self[y][symbol_x], self[y][val2_x] = 0.1, ans, 0.1
+        self[y][val1_x], self[symbol_x, y], self[y][val2_x] = 0.1, ans, 0.1
 
         self.pieces[val1].remove((val1_x, y))
         self.pieces[symbol].remove((symbol_x, y))
@@ -183,7 +188,7 @@ class NumberPuzzle:
         dest = x if is_moving_horizontally else y
         dest_changed = False
         for loc in range(plus_minus(dest, 1), bound, step):
-            val_at_loc = self[y][loc] if is_moving_horizontally else self[loc][x]
+            val_at_loc = self[loc, y] if is_moving_horizontally else self[x, loc]
             if self.is_blank(val_at_loc):
                 dest = loc
                 dest_changed = True
@@ -219,7 +224,7 @@ class NumberPuzzle:
             raise IndexError("'x' is out of range")
         if not self.is_number(y) or y >= self.WIDTH:
             raise IndexError("'y' is out of range")
-        if not self.is_piece(self[y][x]):
+        if not self.is_piece(self[x, y]):
             raise TypeError(f"no movable pieces on location: ({x}, {y})")
         if not isinstance(direction, Direction):
             raise ValueError("invalid 'direction'")
@@ -268,7 +273,7 @@ class NumberPuzzle:
         #     return False
         # x, y = self.pieces.pop()
         # self.
-        # return self[y][x] == self.target
+        # return self[x, y] == self.target
 
     def reset(self) -> None:
         """Reset the puzzle to the initial, same as calling `undo` method infinite times.
@@ -321,15 +326,15 @@ class NumberPuzzle:
                 match cmd:
                     case "move":
                         from_x, from_y, to_x, to_y = args
-                        val = self[to_y][to_x]
-                        self[from_y][from_x], self[to_y][to_x] = val, 0.1
+                        val = self[to_x, to_y]
+                        self[from_x, from_y], self[to_x, to_y] = val, 0.1
 
                         self.pieces[val].add((from_x, from_y))
                         self.pieces[val].remove((to_x, to_y))
                     case "concat":
                         val1, val2, from_x, to_x, y = args
-                        val_after = self[y][to_x]
-                        self[y][from_x], self[y][to_x] = val1, val2
+                        val_after = self[to_x, y]
+                        self[from_x, y], self[to_x, y] = val1, val2
 
                         self.pieces[val_after].remove((to_x, y))
                         self.pieces[val1].add((from_x, y))
@@ -337,7 +342,7 @@ class NumberPuzzle:
                     case "eval":
                         val1, symbol, val2, leftmost_x, rightmost_x, y = args
                         val_after = self[y][leftmost_x + 1]
-                        self[y][leftmost_x], self[y][leftmost_x + 1], self[y][rightmost_x] \
+                        self[leftmost_x, y], self[y][leftmost_x + 1], self[rightmost_x, y] \
                             = val1, symbol, val2
 
                         self.pieces[val_after].remove((leftmost_x + 1, y))
