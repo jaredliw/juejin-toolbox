@@ -92,8 +92,8 @@ def bfs(puzzle, val1, symbol, val2, state=1):
         if len(puzzle.history) <= initial_history_length:
             return list(chain(*puzzle.pieces.values()))
 
-        xs = (puzzle.history[-1][0], puzzle._ShuZiMiTi__full_history[-1][3])
-        ys = (puzzle.history[-1][1], puzzle._ShuZiMiTi__full_history[-1][4])
+        xs = (puzzle.history[-1][0], puzzle._NumberPuzzle__full_history[-1][3])
+        ys = (puzzle.history[-1][1], puzzle._NumberPuzzle__full_history[-1][4])
         filtered_pieces = []
         for loc in chain(*puzzle.pieces.values()):
             if loc[0] in xs or loc[1] in ys:
