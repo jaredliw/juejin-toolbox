@@ -5,6 +5,7 @@ from enum import Enum
 from itertools import zip_longest
 from operator import add, sub
 from typing import List, Tuple, Literal, Any
+from uuid import uuid4
 
 
 class Direction(Enum):
@@ -24,6 +25,8 @@ class NumberPuzzle:
 
         self.pieces = defaultdict(set)
         self.obstacles = set()
+        self.__zobrist_keys = {}
+        self.__zobrist_hash = 0
         has_piece = False
         first_row_width = None
         for y, row in enumerate(puzzle):
@@ -34,8 +37,10 @@ class NumberPuzzle:
                 if self.is_piece(item):
                     has_piece = True
                     self.pieces[item].add((x, y))
+                    self.__calc_hash(x, y, item)
                 elif self.is_obstacle(item):
                     self.obstacles.add((x, y))
+                    self.__calc_hash(x, y, item)
                 elif not self.is_blank(item):
                     raise ValueError(f"invalid value '{item}' in puzzle")
 
@@ -57,14 +62,30 @@ class NumberPuzzle:
 
     def __getitem__(self, item):
         if isinstance(item, tuple):
-            return self.puzzle[item[1]][item[0]]  # Alias self.puzzle[y][x] -> self[x, y]
+            if item[0] < 0 or item[1] < 0:
+                raise IndexError(f"coordinates should ne non-negative, not ({item[0]}, {item[1]})")
+            return self.puzzle[item[1]][item[0]]  # self.puzzle[y][x] == self[x, y]
         return self.puzzle[item]
 
     def __setitem__(self, key, value):
         if isinstance(key, tuple):
-            self.puzzle[key[1]][key[0]] = value  # Alias self.puzzle[y][x] -> self[x, y]
+            if key[0] < 0 or key[1] < 0:
+                raise IndexError(f"coordinates should ne non-negative, not ({key[0]}, {key[1]})")
+            self.puzzle[key[1]][key[0]] = value  # self.puzzle[y][x] == self[x, y]
         else:
             self.puzzle[key] = value
+
+    @property
+    def zobrist_hash(self) -> int:
+        return self.__zobrist_hash
+
+    @zobrist_hash.setter
+    def zobrist_hash(self, value: Any) -> None:
+        raise TypeError("Zobrist hash is read-only")
+
+    @zobrist_hash.deleter
+    def zobrist_hash(self) -> None:
+        raise TypeError("Zobrist hash is read-only")
 
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
@@ -112,6 +133,11 @@ class NumberPuzzle:
     def is_valid_value(value: Any) -> bool:  # Check if it is a valid value in the puzzle
         return NumberPuzzle.is_piece(value) or NumberPuzzle.is_obstacle(value) or NumberPuzzle.is_blank(value)
 
+    def __calc_hash(self, x, y, piece) -> None:
+        if self.__zobrist_keys.get((x, y, piece)) is None:
+            self.__zobrist_keys[x, y, piece] = int(uuid4())
+        self.__zobrist_hash ^= self.__zobrist_keys[x, y, piece]
+
     def __move_piece(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
@@ -121,88 +147,77 @@ class NumberPuzzle:
         self[from_x, from_y], self[to_x, to_y] = 0.1, value
 
         self.pieces[value].remove((from_x, from_y))
+        self.__calc_hash(from_x, from_y, value)
         self.pieces[value].add((to_x, to_y))
+        self.__calc_hash(from_x, from_y, value)
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
+    # Concatenate two numbers, just like strings
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
-        # Concatenate two numbers, just like strings
-        if to_x < 0 or to_x >= self.LENGTH or \
-                not self.is_number(self[from_x, y]) or \
-                not self.is_number(self[to_x, y]):
-            raise ValueError("invalid operation")
-
-        val1, val2 = self[from_x, y], self[to_x, y]
-        # Custom '&' operator does not obey the commutative law, i.e. 7 & 3 != 3 & 7
-        # Result is evaluating from left to right
-        # E.g. 7, 3, swiping to the right -> 0.1, 73
-        #      7, 3, swiping to the left  -> 73, 0.1
-        # Only swap the values, but not the indices; as the result has to be at (to_x, y)
-        ans = self.calc(val2, 0.7, val1) if from_x > to_x else self.calc(val1, 0.7, val2)
+        num1, num2 = self[from_x, y], self[to_x, y]
+        # Result is evaluating from left to right, swap the numbers if to_x < from_x
+        ans = self.calc(num2, 0.7, num1) if from_x > to_x else self.calc(num1, 0.7, num2)
         self[from_x, y], self[to_x, y] = 0.1, ans
 
-        self.pieces[val1].remove((from_x, y))
-        self.pieces[val2].remove((to_x, y))
+        self.pieces[num1].remove((from_x, y))
+        self.__calc_hash(from_x, y, num1)
+        self.pieces[num2].remove((to_x, y))
+        self.__calc_hash(to_x, y, num2)
         self.pieces[ans].add((to_x, y))
-        self.__full_history.append(("concat", val1, val2, from_x, to_x, y))
-        return (to_x, y), (val2, 0.7, val1) if from_x > to_x else (val1, 0.7, val2)
+        self.__calc_hash(to_x, y, ans)
+        self.__full_history.append(("concat", num1, num2, from_x, to_x, y))
+        return (to_x, y), (num2, 0.7, num1) if from_x > to_x else (num1, 0.7, num2)
 
     def __eval_numbers(self, symbol_x: int, y: int) \
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6], int]]:
-        val1_x = symbol_x - 1
-        val2_x = symbol_x + 1
-        if val1_x < 0 or val1_x >= self.LENGTH or val2_x < 0 or val2_x >= self.LENGTH or \
-                not self.is_number(self[y][val1_x]) or \
-                not self.is_symbol(self[symbol_x, y]) or \
-                not self.is_number(self[y][val2_x]):
-            raise ValueError("invalid operation")
-
         # Make sure that the expression is evaluated from left to right
-        if val1_x > val2_x:
+        if (val1_x := symbol_x - 1) > (val2_x := symbol_x + 1):
             val1_x, val2_x = val2_x, val1_x
-        val1, symbol, val2 = self[y][val1_x], self[symbol_x, y], self[y][val2_x]
 
-        try:
-            ans = self.calc(val1, symbol, val2)
-        except ArithmeticError:
-            raise ValueError("invalid operation")
-        self[y][val1_x], self[symbol_x, y], self[y][val2_x] = 0.1, ans, 0.1
+        val1, symbol, val2 = self[val1_x, y], self[symbol_x, y], self[val2_x, y]
+
+        ans = self.calc(val1, symbol, val2)  # Might raise ArithmeticError
+        self[val1_x, y], self[symbol_x, y], self[val2_x, y] = 0.1, ans, 0.1
 
         self.pieces[val1].remove((val1_x, y))
+        self.__calc_hash(val1_x, y, val1)
         self.pieces[symbol].remove((symbol_x, y))
+        self.__calc_hash(symbol_x, y, symbol)
         self.pieces[val2].remove((val2_x, y))
+        self.__calc_hash(val2_x, y, val2)
         self.pieces[ans].add((symbol_x, y))
-        self.__full_history.append(("eval", val1, symbol, val2, val1_x, val2_x, y))
+        self.__calc_hash(symbol_x, y, ans)
+        self.__full_history.append(("eval", val1, symbol, val2, symbol_x, y))
         return (symbol_x, y), (val1, symbol, val2)
 
-    def __move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
+    def __find_destination_and_move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
         is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
         is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
         if is_increasing:
-            bound = self.LENGTH if is_moving_horizontally else self.WIDTH
+            start = x + 1 if is_moving_horizontally else y + 1
+            stop = self.LENGTH if is_moving_horizontally else self.WIDTH
+            step = 1
         else:
-            bound = -1
-        step = 1 if is_increasing else -1
-        plus_minus = add if is_increasing else sub
+            start = x - 1 if is_moving_horizontally else y - 1
+            stop = -1
+            step = -1
 
-        # todo: optimize
-        dest = x if is_moving_horizontally else y
-        dest_changed = False
-        for loc in range(plus_minus(dest, 1), bound, step):
+        changed = False
+        for loc in range(start, stop, step):
             val_at_loc = self[loc, y] if is_moving_horizontally else self[x, loc]
-            if self.is_blank(val_at_loc):
-                dest = loc
-                dest_changed = True
-            else:
+            if not self.is_blank(val_at_loc):
+                loc -= step
                 break
+            changed = True
 
-        if not dest_changed:
-            raise ValueError("Invalid operation")
+        if not changed:
+            return x, y
         if is_moving_horizontally:
-            self.__move_piece(x, y, dest, y)
-            return dest, y
+            self.__move_piece(x, y, loc, y)
+            return loc, y
         else:
-            self.__move_piece(x, y, x, dest)
-            return x, dest
+            self.__move_piece(x, y, x, loc)
+            return x, loc
 
     def move(self, x: int, y: int, direction: Direction) \
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int] | None]:
@@ -219,9 +234,6 @@ class NumberPuzzle:
         :raises ValueError: index out of range or invalid `direction`
         :raises TypeError: no pieces on the coordinate given
         """
-        # Parameter validation
-        if x < 0 or y < 0:
-            raise ValueError(f"coordinates should be non-negative, not ({x}, {y})")
         if not self.is_piece(self[x, y]):
             raise TypeError(f"no movable pieces on ({x}, {y})")
         if not isinstance(direction, Direction):
@@ -237,21 +249,21 @@ class NumberPuzzle:
         # We need something to separate them: None (as a header of each move)
         self.__full_history.append(None)
         operands = None
-        try:
-            x, y = self.__move(x, y, direction)
-        except ValueError:
-            pass
+        x, y = self.__find_destination_and_move(x, y, direction)
 
         if direction in (Direction.LEFT, Direction.RIGHT):
             plus_minus = add if direction == Direction.RIGHT else sub
-            try:
-                (x, y), operands = self.__concat_numbers(x, plus_minus(x, 1), y)
-            except ValueError:
-                pass
-            try:
-                (x, y), operands = self.__eval_numbers(plus_minus(x, 1), y)
-            except ValueError:
-                pass
+
+            if self.is_number(self[x, y]) and 0 <= (next_or_last_x := plus_minus(x, 1)) < self.WIDTH:
+                if self.is_number(self[next_or_last_x, y]):
+                    (x, y), operands = self.__concat_numbers(x, next_or_last_x, y)  # from_x, to_x, y
+                elif 0 <= (next_next_or_last_last_x := plus_minus(next_or_last_x, 1)) < self.WIDTH and \
+                        self.is_symbol(self[next_or_last_x, y]) and \
+                        self.is_number(self[next_next_or_last_last_x, y]):
+                    try:
+                        (x, y), operands = self.__eval_numbers(next_or_last_x, y)  # symbol_x, y
+                    except ArithmeticError:
+                        pass
 
         if original_x == x and original_y == y:  # if no change
             self.__full_history.pop()  # Pop `None`
@@ -265,13 +277,7 @@ class NumberPuzzle:
         :return: state of the puzzle
         :rtype: bool
         """
-        raise NotImplementedError
-        # todo
-        # if len(self.pieces) != 1:
-        #     return False
-        # x, y = self.pieces.pop()
-        # self.
-        # return self[x, y] == self.target
+        raise NotImplementedError  # todo
 
     def reset(self) -> None:
         """Reset the puzzle to the initial, same as calling `undo` method infinite times.
@@ -315,23 +321,33 @@ class NumberPuzzle:
                         self[from_x, from_y], self[to_x, to_y] = val, 0.1
 
                         self.pieces[val].add((from_x, from_y))
+                        self.__calc_hash(from_x, from_y, val)
                         self.pieces[val].remove((to_x, to_y))
+                        self.__calc_hash(to_x, to_y, val)
                     case "concat":
                         val1, val2, from_x, to_x, y = args
                         val_after = self[to_x, y]
                         self[from_x, y], self[to_x, y] = val1, val2
 
                         self.pieces[val_after].remove((to_x, y))
+                        self.__calc_hash(to_x, y, val_after)
                         self.pieces[val1].add((from_x, y))
+                        self.__calc_hash(from_x, y, val1)
                         self.pieces[val2].add((to_x, y))
+                        self.__calc_hash(to_x, y, val2)
                     case "eval":
-                        val1, symbol, val2, leftmost_x, rightmost_x, y = args
-                        val_after = self[y][leftmost_x + 1]
-                        self[leftmost_x, y], self[y][leftmost_x + 1], self[rightmost_x, y] \
-                            = val1, symbol, val2
+                        val1, symbol, val2, symbol_x, y = args
+                        val1_x = symbol_x - 1
+                        val2_x = symbol_x + 1
+                        val_after = self[symbol_x, y]
+                        self[val1_x, y], self[symbol_x, y], self[val2_x, y] = val1, symbol, val2
 
-                        self.pieces[val_after].remove((leftmost_x + 1, y))
-                        self.pieces[val1].add((leftmost_x, y))
-                        self.pieces[symbol].add((leftmost_x + 1, y))
-                        self.pieces[val2].add((rightmost_x, y))
+                        self.pieces[val_after].remove((symbol_x, y))
+                        self.__calc_hash(symbol_x, y, val_after)
+                        self.pieces[val1].add((val1_x, y))
+                        self.__calc_hash(val1_x, y, val1)
+                        self.pieces[symbol].add((symbol_x, y))
+                        self.__calc_hash(symbol_x, y, symbol)
+                        self.pieces[val2].add((val2_x, y))
+                        self.__calc_hash(val2_x, y, val2)
             self.history.pop()
