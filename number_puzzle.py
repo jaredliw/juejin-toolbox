@@ -4,7 +4,7 @@ from copy import deepcopy
 from enum import Enum
 from itertools import zip_longest
 from operator import add, sub
-from typing import List, Union, Tuple, Literal, Any
+from typing import List, Tuple, Literal, Any
 
 
 class Direction(Enum):
@@ -15,7 +15,7 @@ class Direction(Enum):
 
 
 class NumberPuzzle:
-    def __init__(self, puzzle: List[List[Union[float, int]]], target: int):
+    def __init__(self, puzzle: List[List[int | float]], target: int):
         # Parameter validation
         if not self.is_number(target):
             raise ValueError("invalid 'target'")
@@ -23,6 +23,7 @@ class NumberPuzzle:
             raise TypeError("malformed puzzle")
 
         self.pieces = defaultdict(set)
+        self.obstacles = set()
         has_piece = False
         first_row_width = None
         for y, row in enumerate(puzzle):
@@ -30,12 +31,13 @@ class NumberPuzzle:
                 raise TypeError("malformed puzzle")
 
             for x, item in enumerate(row):
-                if not self.is_valid_value(item):
-                    raise ValueError(f"invalid value '{item}' in puzzle")
-
                 if self.is_piece(item):
                     has_piece = True
                     self.pieces[item].add((x, y))
+                elif self.is_obstacle(item):
+                    self.obstacles.add((x, y))
+                elif not self.is_blank(item):
+                    raise ValueError(f"invalid value '{item}' in puzzle")
 
             if first_row_width is None:
                 first_row_width = len(row)
@@ -198,7 +200,7 @@ class NumberPuzzle:
             return x, dest
 
     def move(self, x: int, y: int, direction: Direction) \
-            -> Tuple[Tuple[int, int], Union[None, Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int]]]:
+            -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int] | None]:
         """Move a piece. A move that does not make a change to the puzzle will be omitted.
 
         :param x: x-coordinate of the piece
