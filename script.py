@@ -1,6 +1,6 @@
-from api import fetch_data
+from api import JuejinGameSession
 from number_puzzle import NumberPuzzle
-from solve import find_valid_calculations
+from solve import find_valid_calculations, bfs
 
 PPRINT_GRID_LEFT_RIGHT_PADDING = 1
 FLOAT_TO_SYMBOL = {
@@ -43,14 +43,43 @@ def pprint_puzzle(puzzle: NumberPuzzle) -> None:
 
 
 if __name__ == "__main__":
+    from time import time
+
     MY_TOKEN = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsInNvdXJjZSI6Imp1ZWppbiJ9.eyJleHBpcmVBdCI6MTY0ODQzOTE4MiwidXNlcklkIjoiMTY3NTQzNjc2NjAyMTIwIiwiaWF0IjoxNjQ1ODQ3MTgyLCJleHAiOjE2NDg0MzkxODJ9.0tVlqX2DjFQv5t6POvg9aOMgnKyWE6T0itAzlRap1DDds4OgoiOAceKboOCVfC8MlW9QJMBxL2eDfaS2zpwjpLjH6VMtaTScv40JECnK6zfOjWVO4NNu7w98lO4XsWwS8upAjPf7W666JxfdEc2YGf1dSaMYLmhNzXrxTXZRHc8R3Yb4ULNoswbp9zxC5HIDjw0ud2kZS2K3QwqT03r_vxmOvfLfpLyVA2sPhX9SpqmFR1KmpK56o9HwGF5kOjlPGvIRQRVwOsJTKsjdIgID8KxsvFDOf5ZSMEDoY2QjH3g3ntmtGi6M6XlPvcJWG33r5Dkv8d_5ZXUneSVLbu4c5g"
-    data = fetch_data(MY_TOKEN)
+    session = JuejinGameSession(MY_TOKEN)
+    data = session.fetch_level_data()
 
-    np = NumberPuzzle(data["map"], data["target"])
-    print("Level", data["round"])
-    pprint_puzzle(np)
-    print()
+    while True:
+        start_time = time()
 
-    print("Calculations:")
-    for num1, symbol, num2 in next(find_valid_calculations(np)):
-        print(num1, FLOAT_TO_SYMBOL[symbol], num2)
+        np = NumberPuzzle(data["map"], data["target"])
+        print("Level", data["round"])
+        pprint_puzzle(np)
+        print("Target:", data["target"])
+        print()
+
+        print("Calculations:")
+        solution_generator = find_valid_calculations(np)
+        solution = next(solution_generator, None)
+        if solution is None:
+            print("This puzzle is not solvable. Report this to the author if you think this is a bug.")
+            exit()
+        for num1, symbol, num2 in solution:
+            print(num1, FLOAT_TO_SYMBOL[symbol], num2)
+        print()
+
+        print("Steps:")
+        last_until = 0
+        data_to_submit = []
+        for step in solution:
+            bfs(np, *step)
+            for item in np.history[last_until:]:
+                x, y, direction = np.decode_history_record(item)
+                print(f"({x}, {y}) {direction.name}")
+                data_to_submit.append([y, x, direction.name[0].lower()])
+            last_until = len(np.history)
+        print(session.submit_level(data_to_submit))
+        print()
+
+        end_time = time()
+        print("Time taken:", end_time - start_time)
