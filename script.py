@@ -20,7 +20,7 @@ def pprint_puzzle(puzzle: NumberPuzzle) -> None:
     :return: None
     """
     if not isinstance(puzzle, NumberPuzzle):
-        raise TypeError(f"{puzzle} is not a {type(NumberPuzzle).__name__}")
+        raise TypeError(f"{puzzle} is not a {NumberPuzzle.__name__}")
 
     def _format_piece(item):
         match item:
@@ -45,11 +45,11 @@ def pprint_puzzle(puzzle: NumberPuzzle) -> None:
 if __name__ == "__main__":
     from time import time
 
-    MY_TOKEN = "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsInNvdXJjZSI6Imp1ZWppbiJ9.eyJleHBpcmVBdCI6MTY0ODQzOTE4MiwidXNlcklkIjoiMTY3NTQzNjc2NjAyMTIwIiwiaWF0IjoxNjQ1ODQ3MTgyLCJleHAiOjE2NDg0MzkxODJ9.0tVlqX2DjFQv5t6POvg9aOMgnKyWE6T0itAzlRap1DDds4OgoiOAceKboOCVfC8MlW9QJMBxL2eDfaS2zpwjpLjH6VMtaTScv40JECnK6zfOjWVO4NNu7w98lO4XsWwS8upAjPf7W666JxfdEc2YGf1dSaMYLmhNzXrxTXZRHc8R3Yb4ULNoswbp9zxC5HIDjw0ud2kZS2K3QwqT03r_vxmOvfLfpLyVA2sPhX9SpqmFR1KmpK56o9HwGF5kOjlPGvIRQRVwOsJTKsjdIgID8KxsvFDOf5ZSMEDoY2QjH3g3ntmtGi6M6XlPvcJWG33r5Dkv8d_5ZXUneSVLbu4c5g"
-    session = JuejinGameSession(MY_TOKEN)
-    data = session.fetch_level_data()
+    MY_SESSION = "xxx"
+    session = JuejinGameSession(MY_SESSION)
 
     while True:
+        data = session.fetch_level_data()
         start_time = time()
 
         np = NumberPuzzle(data["map"], data["target"])
@@ -78,6 +78,7 @@ if __name__ == "__main__":
                 print(f"({x}, {y}) {direction.name}")
                 data_to_submit.append([y, x, direction.name[0].lower()])
             last_until = len(np.history)
+            print()
         print(session.submit_level(data_to_submit))
         print()
 
