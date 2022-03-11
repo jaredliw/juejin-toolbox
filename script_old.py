@@ -1,14 +1,18 @@
-from base64 import b64decode
 from copy import copy
 from itertools import chain
-from re import search
 from time import time, sleep
 from typing import List, Literal, Tuple, Union, Generator
 
-from requests import post
+from jwt import decode
+from requests import post, RequestException, get
 
 VALID_OPERATIONS = ("+", "-", "*", "/", "&")
-URL = "https://juejin-game.bytedance.com/game/num-puzz/ugc/start"
+GET_TOKEN_URL = "https://juejin.cn/get/token"
+GAME_URL = "https://juejin-game.bytedance.com/game/num-puzz/ugc/start"
+
+
+class JuejinError(RequestException):
+    pass
 
 
 def calc(num1: int, sym: Literal["+", "-", "*", "/", "&"], num2: int) -> int:
@@ -81,18 +85,32 @@ def brute_force(target: int, nums: List[int], syms: List[Literal["+", "-", "*", 
     return _inner(nums, syms)
 
 
-def fetch_data(authorization: str) -> dict:
-    headers = {
-        "authorization": authorization
-    }
-    search_result = search(r'(?<="userId":")\d*', str(b64decode(authorization.removeprefix("Bearer ") + "==")))
-    if search_result is None:
+def get_token_and_uid(session_id: str) -> Tuple[str, str]:
+    response = get(GET_TOKEN_URL, cookies={
+        "sessionid": session_id
+    }).json()
+    try:
+        token = response["data"]
+    except:
+        raise JuejinError(response["err_msg"]) from None  # Suppress the context being printed
+    try:
+        uid = decode(token, options={"verify_signature": False})["userId"]
+    except:
         raise ValueError("invalid token")
-    params = {
-        "uid": search_result[0],
-        "time": time() * 1000
-    }
-    return post(URL, headers=headers, params=params).json()["data"]
+    return token, uid
+
+
+def fetch_data(token: str, uid: str) -> dict:
+    response = post(GAME_URL, headers={
+        "authorization": "Bearer " + token
+    }, params={
+        "uid": uid,
+        "time": int(time() * 1000)
+    }).json()
+    try:
+        return response["data"]
+    except KeyError:
+        raise JuejinError(response["message"]) from None
 
 
 def resolve_map(game_map: List[List[Union[int, float]]]) -> Tuple[List[int], List[Literal["+", "-", "*", "/"]]]:
@@ -114,11 +132,12 @@ def resolve_map(game_map: List[List[Union[int, float]]]) -> Tuple[List[int], Lis
 
 if __name__ == "__main__":
     # Edit here
-    MY_TOKEN = "Bearer xxx"
+    MY_SESSION_ID = "xxx"
 
+    TOKEN, UID = get_token_and_uid(MY_SESSION_ID)
     last_level = None
     while True:
-        data = fetch_data(MY_TOKEN)
+        data = fetch_data(TOKEN, UID)
         level = data["round"]
         if last_level != level:
             print("Level", level)
