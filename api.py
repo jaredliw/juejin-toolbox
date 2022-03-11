@@ -1,10 +1,9 @@
-from base64 import b64decode
-from re import search
 from time import time
 from typing import List
 from urllib.parse import urljoin
 
-from requests import post, RequestException
+from jwt import decode
+from requests import post, RequestException, get
 
 
 class JuejinError(RequestException):
@@ -15,34 +14,45 @@ class JuejinError(RequestException):
 class JuejinGameSession:
     """Juejin game session."""
     BASE_URL = "https://juejin-game.bytedance.com/game/num-puzz/ugc/"
+    GET_TOKEN_URL = "https://juejin.cn/get/token"
 
-    def __init__(self, token: str):
-        self.__token = token
-        self.__uid = self.__get_uid_from_token()
-        self.__HEADERS = {
-            "authorization": self.__token
+    def __init__(self, session_id: str):
+        self.SESSION_ID = session_id
+        self.TOKEN = self.__get_token_from_session_id()
+        self.UID = self.__get_uid_from_token()
+        self.HEADERS = {
+            "authorization": "Bearer " + self.TOKEN
         }
-        self.__PARAMS = {
-            "uid": self.__uid,
+        self.PARAMS = {
+            "uid": self.UID,
             "time": int(time() * 1000)  # Millisecond timestamp
         }
+
+    def __get_token_from_session_id(self) -> str:
+        response = get(self.GET_TOKEN_URL, cookies={
+            "sessionid": self.SESSION_ID
+        }).json()
+        try:
+            return response["data"]
+        except:
+            raise JuejinError(response["err_msg"]) from None  # Suppress the context being printed
 
     def __get_uid_from_token(self) -> str:
         # token is base64 encoded, UID is in it
         # Be aware of padding error
-        decoded_token = str(b64decode(self.__token.removeprefix("Bearer ") + "=="))  # extra '=' will be omitted
-        search_result = search(r'(?<="userId":")\d*', decoded_token)  # Search for UID in token
-        if search_result is None:
+        # extra '=' will be omitted
+        try:
+            return decode(self.TOKEN, options={"verify_signature": False})["userId"]
+        except:
             raise ValueError("invalid token")
-        return search_result[0]
 
     def __post_request_handler(self, url_path: str, data: dict | None = None) -> dict:
         if data is None:
             data = {}
 
         response = post(urljoin(self.BASE_URL, url_path),
-                        headers=self.__HEADERS,
-                        params=self.__PARAMS,
+                        headers=self.HEADERS,
+                        params=self.PARAMS,
                         json=data).json()
         try:
             return response["data"]
