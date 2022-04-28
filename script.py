@@ -38,15 +38,15 @@ def pprint_puzzle(puzzle: NumberPuzzle) -> None:
 
     for row in puzzle.puzzle:
         print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
-        print("|" + "|".join(_format_piece(item).center(max_cell_width) for item in row) + "|")
+        print("|" + "|".join(_format_piece(row_item).center(max_cell_width) for row_item in row) + "|")
     print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
 
 
 if __name__ == "__main__":
     from time import time
+    from config import session_id
 
-    MY_SESSION = "xxx"
-    session = JuejinGameSession(MY_SESSION)
+    session = JuejinGameSession(session_id)
 
     while True:
         data = session.fetch_level_data()
@@ -73,8 +73,8 @@ if __name__ == "__main__":
         data_to_submit = []
         for step in solution:
             bfs(np, *step)
-            for item in np.history[last_until:]:
-                x, y, direction = np.decode_history_record(item)
+            for record in np.history[last_until:]:
+                x, y, direction = np.decode_history_record(record)
                 print(f"({x}, {y}) {direction.name}")
                 data_to_submit.append([y, x, direction.name[0].lower()])
             last_until = len(np.history)
