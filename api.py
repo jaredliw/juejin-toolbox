@@ -38,9 +38,9 @@ class JuejinGameSession:
             raise JuejinError(response["err_msg"]) from None  # Suppress the context being printed
 
     def __get_uid_from_token(self) -> str:
-        # token is base64 encoded, UID is in it
+        # Token is base64 encoded, UID is in it
         # Be aware of padding error
-        # extra '=' will be omitted
+        # Extra '=' will be omitted
         try:
             return decode(self.TOKEN, options={"verify_signature": False})["userId"]
         except:
@@ -57,13 +57,13 @@ class JuejinGameSession:
         try:
             return response["data"]
         except KeyError:
-            raise JuejinError(response["message"]) from None  # Suppress the context being printed
+            # Suppress the context being printed
+            raise JuejinError(response["message"]) from None
 
     def fetch_level_data(self) -> dict:
         return self.__post_request_handler("start")
 
     def submit_level(self, commands: List[list]) -> dict:
         return self.__post_request_handler("complete", {
-            "originality": 0,
             "command": commands
         })
