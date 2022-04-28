@@ -64,14 +64,16 @@ class NumberPuzzle:
         if isinstance(item, tuple):
             if item[0] < 0 or item[1] < 0:
                 raise IndexError(f"coordinates should ne non-negative, not ({item[0]}, {item[1]})")
-            return self.puzzle[item[1]][item[0]]  # self.puzzle[y][x] == self[x, y]
+            # self.puzzle[y][x] is the same as self[x, y]
+            return self.puzzle[item[1]][item[0]]
         return self.puzzle[item]
 
     def __setitem__(self, key, value):
         if isinstance(key, tuple):
             if key[0] < 0 or key[1] < 0:
                 raise IndexError(f"coordinates should ne non-negative, not ({key[0]}, {key[1]})")
-            self.puzzle[key[1]][key[0]] = value  # self.puzzle[y][x] == self[x, y]
+            # self.puzzle[y][x] is the same as self[x, y]
+            self.puzzle[key[1]][key[0]] = value
         else:
             self.puzzle[key] = value
 
@@ -79,14 +81,7 @@ class NumberPuzzle:
     def zobrist_hash(self) -> int:
         return self.__zobrist_hash
 
-    @zobrist_hash.setter
-    def zobrist_hash(self, value: Any) -> None:
-        raise TypeError("Zobrist hash is read-only")
-
-    @zobrist_hash.deleter
-    def zobrist_hash(self) -> None:
-        raise TypeError("Zobrist hash is read-only")
-
+    # noinspection PyTypeHints
     @staticmethod
     def calc(num1: int, symbol: Literal[0.3, 0.4, 0.5, 0.6, 0.7], num2: int) -> int:
         if not (NumberPuzzle.is_number(num1) and NumberPuzzle.is_number(num2)):
@@ -104,13 +99,14 @@ class NumberPuzzle:
                 if not (ans := num1 / num2).is_integer():
                     raise ArithmeticError(f"{num1} is not divisible by {num2}")
                 return int(ans)
-            case 0.7:  # Self-defined operator 0.7 ('&') -> 3 & 7 = 37, 7 & 3 = 73
+            # Self-defined operator 0.7 ('&') -> 3 & 7 = 37, 7 & 3 = 73
+            case 0.7:
                 return int(str(num1) + str(num2))
             case _:
                 raise ValueError(f"unrecognized operator: {symbol}")
 
     @staticmethod
-    def is_number(value: Any) -> bool:  # Refer to numbers in the puzzle, non-negative
+    def is_number(value: Any) -> bool:  # Numbers in the puzzle, non-negative
         return isinstance(value, int) and value >= 0
 
     @staticmethod
@@ -130,7 +126,7 @@ class NumberPuzzle:
         return value == 0.2
 
     @staticmethod
-    def is_valid_value(value: Any) -> bool:  # Check if it is a valid value in the puzzle
+    def is_valid_value(value: Any) -> bool:  # Check if it is a valid value on the game board
         return NumberPuzzle.is_piece(value) or NumberPuzzle.is_obstacle(value) or NumberPuzzle.is_blank(value)
 
     def __calc_hash(self, x, y, piece) -> None:
@@ -152,6 +148,7 @@ class NumberPuzzle:
         self.__calc_hash(from_x, from_y, value)
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
+    # noinspection PyTypeHints
     # Concatenate two numbers, just like strings
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
         num1, num2 = self[from_x, y], self[to_x, y]
@@ -168,6 +165,7 @@ class NumberPuzzle:
         self.__full_history.append(("concat", num1, num2, from_x, to_x, y))
         return (to_x, y), (num2, 0.7, num1) if from_x > to_x else (num1, 0.7, num2)
 
+    # noinspection PyTypeHints
     def __eval_numbers(self, symbol_x: int, y: int) \
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6], int]]:
         # Make sure that the expression is evaluated from left to right
@@ -219,9 +217,10 @@ class NumberPuzzle:
             self.__move_piece(x, y, x, loc)
             return x, loc
 
+    # noinspection PyTypeHints
     def move(self, x: int, y: int, direction: Direction) \
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int] | None]:
-        """Move a piece. A move that does not make a change to the puzzle will be omitted.
+        """Move a piece. A move that does not make a change to the puzzle will not be recorded.
 
         :param x: x-coordinate of the piece
         :type x: int
@@ -246,7 +245,7 @@ class NumberPuzzle:
         #   - move + concat
         #   - eval
         #   - concat
-        # We need something to separate them: None (as a header of each move)
+        # We need something to separate moves: None (as a header of each move)
         self.__full_history.append(None)
         operands = None
         x, y = self.__find_destination_and_move(x, y, direction)
@@ -265,8 +264,9 @@ class NumberPuzzle:
                     except ArithmeticError:
                         pass
 
-        if original_x == x and original_y == y:  # if no change
-            self.__full_history.pop()  # Pop `None`
+        # If no changes, pop `None`
+        if original_x == x and original_y == y:
+            self.__full_history.pop()
         else:
             self.history.append((original_x, original_y, direction))
         return (x, y), operands

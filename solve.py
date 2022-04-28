@@ -6,6 +6,7 @@ from typing import List, Literal, Generator, Tuple
 from number_puzzle import Direction, NumberPuzzle
 
 
+# noinspection PyTypeHints
 def find_valid_calculations(puzzle: NumberPuzzle) \
         -> Generator[List[Tuple[int, Literal[0.3, 0.4, 0.5, 0.6, 0.7], int]], None, None]:
     """Find all valid calculations that are able to solve the given puzzle.
