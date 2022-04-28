@@ -1,6 +1,4 @@
 .idea/
 __pycache__/
-
-lab.py
-lab2.py
-lab3.py
+test/
+.venv/
