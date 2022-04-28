@@ -9,10 +9,10 @@ from uuid import uuid4
 
 
 class Direction(Enum):
-    LEFT = "L"
-    RIGHT = "R"
-    UP = "U"
-    DOWN = "D"
+    LEFT = 0
+    RIGHT = 1
+    UP = 2
+    DOWN = 3
 
 
 class NumberPuzzle:
@@ -149,7 +149,6 @@ class NumberPuzzle:
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     # noinspection PyTypeHints
-    # Concatenate two numbers, just like strings
     def __concat_numbers(self, from_x: int, to_x: int, y: int) -> Tuple[Tuple[int, int], Tuple[int, Literal[0.7], int]]:
         num1, num2 = self[from_x, y], self[to_x, y]
         # Result is evaluating from left to right, swap the numbers if to_x < from_x
@@ -166,6 +165,7 @@ class NumberPuzzle:
         return (to_x, y), (num2, 0.7, num1) if from_x > to_x else (num1, 0.7, num2)
 
     # noinspection PyTypeHints
+    # Concatenate two numbers, just like strings
     def __eval_numbers(self, symbol_x: int, y: int) \
             -> Tuple[Tuple[int, int], Tuple[int, Literal[0.3, 0.4, 0.5, 0.6], int]]:
         # Make sure that the expression is evaluated from left to right
@@ -188,6 +188,7 @@ class NumberPuzzle:
         self.__full_history.append(("eval", val1, symbol, val2, symbol_x, y))
         return (symbol_x, y), (val1, symbol, val2)
 
+    # noinspection PyTypeHints
     def __find_destination_and_move(self, x: int, y: int, direction: Direction) -> Tuple[int, int]:
         is_increasing = direction in (Direction.RIGHT, Direction.DOWN)
         is_moving_horizontally = direction in (Direction.LEFT, Direction.RIGHT)
@@ -216,6 +217,17 @@ class NumberPuzzle:
         else:
             self.__move_piece(x, y, x, loc)
             return x, loc
+
+    def encode_history_record(self, x: int, y: int, direction: Direction) -> int:
+        return x << (self.WIDTH.bit_length() + 2) | y << 2 | direction.value
+
+    def decode_history_record(self, value: int) -> Tuple[int, int, Direction]:
+        direction = Direction(value & 0b11)
+
+        value >>= 2
+        y = value & ((1 << self.WIDTH.bit_length()) - 1)
+        x = value >> self.WIDTH.bit_length()
+        return x, y, direction
 
     # noinspection PyTypeHints
     def move(self, x: int, y: int, direction: Direction) \
@@ -268,7 +280,7 @@ class NumberPuzzle:
         if original_x == x and original_y == y:
             self.__full_history.pop()
         else:
-            self.history.append((original_x, original_y, direction))
+            self.history.append(self.encode_history_record(original_x, original_y, direction))
         return (x, y), operands
 
     def is_solved(self) -> bool:
@@ -286,15 +298,15 @@ class NumberPuzzle:
         """
         self.undo(len(self.__full_history))
 
-    def restore_state_to(self, history: List[Tuple[int, int, Direction]]) -> None:
+    def restore_state_to(self, history: List[int], *, offset: int = 0) -> None:
         longest_common_prefix_length = 0
-        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.history, history)):
+        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.history[offset:], history)):
             if this != that:
                 break
 
-        self.undo(len(self.history) - longest_common_prefix_length)
-        for args in history[longest_common_prefix_length:]:
-            self.move(*args)
+        self.undo(len(self.history[offset:]) - longest_common_prefix_length)
+        for item in history[longest_common_prefix_length:]:
+            self.move(*self.decode_history_record(item))
 
     def undo(self, move_count: int = 1) -> None:
         """Return the state of the puzzle to `move_count` number of moves before.
