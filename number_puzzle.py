@@ -134,6 +134,17 @@ class NumberPuzzle:
             self.__zobrist_keys[x, y, piece] = int(uuid4())
         self.__zobrist_hash ^= self.__zobrist_keys[x, y, piece]
 
+    def __create_piece(self, x, y, value):  # Update self.pieces, calculate new Zobrist hash
+        self.pieces[value].add((x, y))
+        self.__calc_hash(x, y, value)
+
+    def __destroy_piece(self, x, y, value):  # Update self.pieces, calculate new Zobrist hash
+        self.pieces[value].remove((x, y))
+        # Remove the set if it is empty
+        if not self.pieces[value]:
+            del self.pieces[value]
+        self.__calc_hash(x, y, value)
+
     def __move_piece(self, from_x: int, from_y: int, to_x: int, to_y: int) -> None:
         # Move a piece all the way horizontally or vertically until it meets another piece or an obstacle
         # Therefore, either from_x == to_x or from_y == to_y in order to be valid
@@ -142,10 +153,8 @@ class NumberPuzzle:
         value = self[from_x, from_y]
         self[from_x, from_y], self[to_x, to_y] = 0.1, value
 
-        self.pieces[value].remove((from_x, from_y))
-        self.__calc_hash(from_x, from_y, value)
-        self.pieces[value].add((to_x, to_y))
-        self.__calc_hash(from_x, from_y, value)
+        self.__destroy_piece(from_x, from_y, value)
+        self.__create_piece(to_x, to_y, value)
         self.__full_history.append(("move", from_x, from_y, to_x, to_y))
 
     # noinspection PyTypeHints
@@ -155,12 +164,9 @@ class NumberPuzzle:
         ans = self.calc(num2, 0.7, num1) if from_x > to_x else self.calc(num1, 0.7, num2)
         self[from_x, y], self[to_x, y] = 0.1, ans
 
-        self.pieces[num1].remove((from_x, y))
-        self.__calc_hash(from_x, y, num1)
-        self.pieces[num2].remove((to_x, y))
-        self.__calc_hash(to_x, y, num2)
-        self.pieces[ans].add((to_x, y))
-        self.__calc_hash(to_x, y, ans)
+        self.__destroy_piece(from_x, y, num1)
+        self.__destroy_piece(to_x, y, num2)
+        self.__create_piece(to_x, y, ans)
         self.__full_history.append(("concat", num1, num2, from_x, to_x, y))
         return (to_x, y), (num2, 0.7, num1) if from_x > to_x else (num1, 0.7, num2)
 
@@ -177,14 +183,10 @@ class NumberPuzzle:
         ans = self.calc(val1, symbol, val2)  # Might raise ArithmeticError
         self[val1_x, y], self[symbol_x, y], self[val2_x, y] = 0.1, ans, 0.1
 
-        self.pieces[val1].remove((val1_x, y))
-        self.__calc_hash(val1_x, y, val1)
-        self.pieces[symbol].remove((symbol_x, y))
-        self.__calc_hash(symbol_x, y, symbol)
-        self.pieces[val2].remove((val2_x, y))
-        self.__calc_hash(val2_x, y, val2)
-        self.pieces[ans].add((symbol_x, y))
-        self.__calc_hash(symbol_x, y, ans)
+        self.__destroy_piece(val1_x, y, val1)
+        self.__destroy_piece(symbol_x, y, symbol)
+        self.__destroy_piece(val2_x, y, val2)
+        self.__create_piece(symbol_x, y, ans)
         self.__full_history.append(("eval", val1, symbol, val2, symbol_x, y))
         return (symbol_x, y), (val1, symbol, val2)
 
@@ -332,20 +334,16 @@ class NumberPuzzle:
                         val = self[to_x, to_y]
                         self[from_x, from_y], self[to_x, to_y] = val, 0.1
 
-                        self.pieces[val].add((from_x, from_y))
-                        self.__calc_hash(from_x, from_y, val)
-                        self.pieces[val].remove((to_x, to_y))
-                        self.__calc_hash(to_x, to_y, val)
+                        self.__destroy_piece(to_x, to_y, val)
+                        self.__create_piece(from_x, from_y, val)
                     case "concat":
                         val1, val2, from_x, to_x, y = args
                         val_after = self[to_x, y]
                         self[from_x, y], self[to_x, y] = val1, val2
 
-                        self.pieces[val_after].remove((to_x, y))
-                        self.__calc_hash(to_x, y, val_after)
-                        self.pieces[val1].add((from_x, y))
-                        self.__calc_hash(from_x, y, val1)
-                        self.pieces[val2].add((to_x, y))
+                        self.__destroy_piece(to_x, y, val_after)
+                        self.__create_piece(from_x, y, val1)
+                        self.__create_piece(to_x, y, val2)
                         self.__calc_hash(to_x, y, val2)
                     case "eval":
                         val1, symbol, val2, symbol_x, y = args
@@ -354,12 +352,9 @@ class NumberPuzzle:
                         val_after = self[symbol_x, y]
                         self[val1_x, y], self[symbol_x, y], self[val2_x, y] = val1, symbol, val2
 
-                        self.pieces[val_after].remove((symbol_x, y))
-                        self.__calc_hash(symbol_x, y, val_after)
-                        self.pieces[val1].add((val1_x, y))
-                        self.__calc_hash(val1_x, y, val1)
-                        self.pieces[symbol].add((symbol_x, y))
-                        self.__calc_hash(symbol_x, y, symbol)
-                        self.pieces[val2].add((val2_x, y))
+                        self.__destroy_piece(val1_x, y, val1)
+                        self.__destroy_piece(symbol_x, y, symbol)
+                        self.__destroy_piece(val2_x, y, val2)
+                        self.__create_piece(symbol_x, y, val_after)
                         self.__calc_hash(val2_x, y, val2)
             self.history.pop()
