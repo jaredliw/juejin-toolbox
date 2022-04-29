@@ -2,7 +2,6 @@ from collections import defaultdict
 from collections.abc import Iterable
 from copy import deepcopy
 from enum import Enum
-from itertools import zip_longest
 from operator import add, sub
 from typing import List, Tuple, Literal, Any
 from uuid import uuid4
@@ -327,16 +326,6 @@ class NumberPuzzle:
         """
         self.undo(len(self.__full_history))
 
-    def restore_state_to(self, history: List[int], *, offset: int = 0) -> None:
-        longest_common_prefix_length = 0
-        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(self.history[offset:], history)):
-            if this != that:
-                break
-
-        self.undo(len(self.history[offset:]) - longest_common_prefix_length)
-        for item in history[longest_common_prefix_length:]:
-            self.move(*self.decode_history_record(item))
-
     def undo(self, move_count: int = 1) -> None:
         """Return the state of the puzzle to `move_count` number of moves before.
 
@@ -379,9 +368,9 @@ class NumberPuzzle:
                         val_after = self[symbol_x, y]
                         self[val1_x, y], self[symbol_x, y], self[val2_x, y] = val1, symbol, val2
 
-                        self.__destroy_piece(val1_x, y, val1)
-                        self.__destroy_piece(symbol_x, y, symbol)
-                        self.__destroy_piece(val2_x, y, val2)
-                        self.__create_piece(symbol_x, y, val_after)
+                        self.__destroy_piece(symbol_x, y, val_after)
+                        self.__create_piece(val1_x, y, val1)
+                        self.__create_piece(symbol_x, y, symbol)
+                        self.__create_piece(val2_x, y, val2)
                         self.__calc_hash(val2_x, y, val2)
             self.history.pop()

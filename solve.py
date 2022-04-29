@@ -1,6 +1,6 @@
 from collections import deque
 from copy import copy
-from itertools import chain
+from itertools import chain, zip_longest
 from typing import List, Literal, Generator, Tuple
 
 from number_puzzle import Direction, NumberPuzzle
@@ -77,11 +77,21 @@ def bfs(puzzle: NumberPuzzle, val1, symbol, val2, second_try=False):
         else:
             return operands == (val1, symbol, val2)
 
-    def get_pieces():
+    def _get_pieces():
         if not second_try:
             return list(chain(puzzle.pieces[val1], puzzle.pieces[symbol], puzzle.pieces[val2]))
         else:
             return list(chain(*puzzle.pieces.values()))
+
+    def _restore_state_to(ref_history: List[int], *, offset: int = 0) -> None:
+        longest_common_prefix_length = 0
+        for longest_common_prefix_length, (this, that) in enumerate(zip_longest(puzzle.history[offset:], ref_history)):
+            if this != that:
+                break
+
+        puzzle.undo(len(puzzle.history[offset:]) - longest_common_prefix_length)
+        for item in ref_history[longest_common_prefix_length:]:
+            puzzle.move(*puzzle.decode_history_record(item))
 
     to_do = deque([[]])
     hashes = {puzzle.zobrist_hash}
@@ -89,8 +99,8 @@ def bfs(puzzle: NumberPuzzle, val1, symbol, val2, second_try=False):
 
     while to_do:
         history = to_do.popleft()
-        puzzle.restore_state_to(history, offset=initial_history_length)
-        for x, y in get_pieces():
+        _restore_state_to(history, offset=initial_history_length)
+        for x, y in _get_pieces():
             for direction in Direction:
                 (moved_x, moved_y), operands = puzzle.move(x, y, direction)
                 if x == moved_x and y == moved_y:
