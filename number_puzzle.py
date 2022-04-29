@@ -291,7 +291,8 @@ class NumberPuzzle:
         :return: state of the puzzle
         :rtype: bool
         """
-        raise NotImplementedError  # todo
+        keys = list(self.pieces.keys())
+        return len(keys) == 1 and keys[0] == self.target
 
     def reset(self) -> None:
         """Reset the puzzle to the initial, same as calling `undo` method infinite times.
