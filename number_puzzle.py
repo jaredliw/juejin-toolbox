@@ -9,9 +9,10 @@ from uuid import uuid4
 
 
 class Direction(Enum):
+    # Clockwise
     LEFT = 0
-    RIGHT = 1
-    UP = 2
+    UP = 1
+    RIGHT = 2
     DOWN = 3
 
 
@@ -214,16 +215,41 @@ class NumberPuzzle:
         if not changed:
             return x, y
         if is_moving_horizontally:
+            # noinspection PyUnboundLocalVariable
+            # I am quite sure that reference before assignment will not occur
             self.__move_piece(x, y, loc, y)
             return loc, y
         else:
+            # noinspection PyUnboundLocalVariable
+            # I am quite sure that reference before assignment will not occur
             self.__move_piece(x, y, x, loc)
             return x, loc
 
     def encode_history_record(self, x: int, y: int, direction: Direction) -> int:
+        """Encode the history record into an integer. The first `self.LENGTH.bit_length()` bits represent
+        the x-coordinate of the piece, followed by `self.WIDTH.bit_length()` bits of the y-coordinate. The last two bits
+        are direction.
+
+        :param x: x-coordinate of the piece
+        :type x: int
+        :param y: y-coordinate of the piece
+        :type y: int
+        :param direction: moving direction
+        :type direction: Direction
+        :return: Encoded record
+        :rtype: int
+        """
+        # As the size of the history grows too rapidly (and causes MemoryError), I came up with this solution
         return x << (self.WIDTH.bit_length() + 2) | y << 2 | direction.value
 
     def decode_history_record(self, value: int) -> Tuple[int, int, Direction]:
+        """Reverse process of `encode_history_record` method, see that method for more information.
+
+        :param value: Encoded record
+        :type value: int
+        :return: x-coordinate and y-coordinate of the piece as well as direction (either left, right, up or down)
+        :rtype: Tuple[int, int, Direction]
+        """
         direction = Direction(value & 0b11)
 
         value >>= 2
