@@ -3,12 +3,9 @@ from typing import List
 from urllib.parse import urljoin
 
 from jwt import decode
-from requests import post, RequestException, get
+from requests import post, get
 
-
-class JuejinError(RequestException):
-    """Raised when Juejin returns a status code other than 200 OK."""
-    pass
+from __init__ import JuejinError
 
 
 class JuejinGameSession:
@@ -17,20 +14,20 @@ class JuejinGameSession:
     GET_TOKEN_URL = "https://juejin.cn/get/token"
 
     def __init__(self, session_id: str):
-        self.SESSION_ID = session_id
-        self.TOKEN = self.__get_token_from_session_id()
-        self.UID = self.__get_uid_from_token()
-        self.HEADERS = {
-            "authorization": "Bearer " + self.TOKEN
+        self.session_id = session_id
+        self.token = self.__get_token_from_session_id()
+        self.uid = self.__get_uid_from_token()
+        self.headers = {
+            "authorization": "Bearer " + self.token
         }
-        self.PARAMS = {
-            "uid": self.UID,
+        self.params = {
+            "uid": self.uid,
             "time": int(time() * 1000)  # Millisecond timestamp
         }
 
     def __get_token_from_session_id(self) -> str:
         response = get(self.GET_TOKEN_URL, cookies={
-            "sessionid": self.SESSION_ID
+            "sessionid": self.session_id
         }).json()
         try:
             return response["data"]
@@ -42,7 +39,7 @@ class JuejinGameSession:
         # Be aware of padding error
         # Extra '=' will be omitted
         try:
-            return decode(self.TOKEN, options={"verify_signature": False})["userId"]
+            return decode(self.token, options={"verify_signature": False})["userId"]
         except:
             raise ValueError("invalid token")
 
@@ -51,8 +48,8 @@ class JuejinGameSession:
             data = {}
 
         response = post(urljoin(self.BASE_URL, url_path),
-                        headers=self.HEADERS,
-                        params=self.PARAMS,
+                        headers=self.headers,
+                        params=self.params,
                         json=data).json()
         try:
             return response["data"]

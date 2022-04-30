@@ -1,4 +1,4 @@
-from api import JuejinGameSession, JuejinError
+from api import JuejinGameSession
 from number_puzzle import NumberPuzzle
 from solve import find_valid_calculations, bfs
 
@@ -44,11 +44,9 @@ def pprint_puzzle(puzzle: NumberPuzzle) -> None:
 
 if __name__ == "__main__":
     from time import time
-    from os import environ
 
-    session_id = environ["JUEJIN_SESSION_ID"]
-    if not session_id:
-        raise JuejinError("environment variable 'JUEJIN_SESSION_ID' is not set")
+    from __init__ import session_id
+
     session = JuejinGameSession(session_id)
 
     while True:
