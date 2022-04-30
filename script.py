@@ -1,66 +1,89 @@
-from collections import deque
-from copy import copy
-from time import time
+from api import JuejinGameSession, JuejinError
+from number_puzzle import NumberPuzzle
+from solve import find_valid_calculations, bfs
 
-from shuzimiti import Direction, ShuZiMiTi
+PPRINT_GRID_LEFT_RIGHT_PADDING = 1
+FLOAT_TO_SYMBOL = {
+    0.3: "+",
+    0.4: "-",
+    0.5: "*",
+    0.6: "/",
+    0.7: "&"
+}
 
 
-def bfs(puzzle):
-    to_do = deque([[]])
-    states = [puzzle.get_pieces()]
+def pprint_puzzle(puzzle: NumberPuzzle) -> None:
+    """Pretty Juejin Number Puzzle.
 
-    while to_do:
-        history = to_do.popleft()
-        puzzle.restore_state_to(history)
-        for x, y in puzzle.get_pieces():
-            for direction in Direction:
-                moved_x, moved_y = puzzle.move(x, y, direction)
-                pieces = puzzle.get_pieces()
-                if x == moved_x and y == moved_y:
-                    continue
-                if puzzle.is_solved():
-                    return
+    :param puzzle: A puzzle
+    :type puzzle: NumberPuzzle
+    :return: None
+    """
+    if not isinstance(puzzle, NumberPuzzle):
+        raise TypeError(f"{puzzle} is not a {NumberPuzzle.__name__}")
 
-                if pieces not in states:
-                    states.append(pieces)
-                    new_history = copy(history)
-                    new_history.append((x, y, direction))
-                    to_do.append(new_history)
-                puzzle.undo()
+    def _format_piece(item):
+        match item:
+            case 0.1:
+                return ""
+            case 0.2:
+                return "\u2588" * (max_cell_width - 2 * PPRINT_GRID_LEFT_RIGHT_PADDING)  # a solid black block
+            case 0.3 | 0.4 | 0.5 | 0.6:
+                return FLOAT_TO_SYMBOL[item]
+            case _:
+                return str(item)
+
+    max_cell_width = max(map(lambda piece: len(str(piece)) if isinstance(piece, int) else -1, puzzle.pieces.keys()))
+    max_cell_width += 2 * PPRINT_GRID_LEFT_RIGHT_PADDING
+
+    for row in puzzle.puzzle:
+        print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
+        print("|" + "|".join(_format_piece(row_item).center(max_cell_width) for row_item in row) + "|")
+    print("+" + "+".join("-" * max_cell_width for _ in range(puzzle.WIDTH)) + "+")
 
 
 if __name__ == "__main__":
-    from numpy import matrix
+    from time import time
+    from os import environ
 
+    session_id = environ["JUEJIN_SESSION_ID"]
+    if not session_id:
+        raise JuejinError("environment variable 'JUEJIN_SESSION_ID' is not set")
+    session = JuejinGameSession(session_id)
 
-    def pprint(arr):
-        print(matrix(arr))
+    while True:
+        data = session.fetch_level_data()
+        start_time = time()
 
+        np = NumberPuzzle(data["map"], data["target"])
+        print("Level", data["round"])
+        pprint_puzzle(np)
+        print("Target:", data["target"])
+        print()
 
-    test_map = [
-        [0.1, 0.1, 0.2, 0.3, 0.2, 19, 0.1],
-        [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-        [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
-        [0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
-        [0.1, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1],
-        [0.1, 0.2, 0.1, 0.1, 0.1, 0.2, 0.1],
-        [11, 0.1, 0.2, 0.1, 0.1, 0.1, 0.1]
-    ]
-    test_puzzle = ShuZiMiTi(test_map, 30)
+        print("Calculations:")
+        solution_generator = find_valid_calculations(np)
+        solution = next(solution_generator, None)
+        if solution is None:
+            print("This puzzle is not solvable. Report this to the author if you think this is a bug.")
+            exit()
+        for num1, symbol, num2 in solution:
+            print(num1, FLOAT_TO_SYMBOL[symbol], num2)
+        print()
 
-    start_time = time()
-    bfs(test_puzzle)
-    end_time = time()
+        print("Steps:")
+        last_until = 0
+        data_to_submit = []
+        for step in solution:
+            bfs(np, *step)
+            for record in np.history[last_until:]:
+                x, y, direction = np.decode_history_record(record)
+                print(f"({x}, {y}) {direction.name}")
+                data_to_submit.append([y, x, direction.name[0].lower()])
+            last_until = len(np.history)
+            print()
+        print(session.submit_level(data_to_submit))
+        print()
 
-    pprint(test_puzzle.puzzle)
-    answer = test_puzzle.get_history()
-    for args in answer:
-        print(*args)
-
-    print("\nTime taken:", end_time - start_time)
-
-    # Validate answer
-    new_puzzle = ShuZiMiTi(test_map, 30)
-    for args in answer:
-        new_puzzle.move(*args)
-    assert new_puzzle.is_solved()
+        end_time = time()
+        print("Time taken:", end_time - start_time)
