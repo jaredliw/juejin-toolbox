@@ -3,7 +3,7 @@ if __name__ == "__main__":
 
     from __init__ import session_id
     from api import Lottery
-    from src.check_in.api import JuejinSession
+    from check_in.api import JuejinSession
 
     lottery = Lottery(JuejinSession(session_id))
     lottery_config = lottery.get_config()

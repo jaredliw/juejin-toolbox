@@ -27,7 +27,8 @@ jobs:
       - name: Run script
         # Set step as succeeded on timeout
         run: |
-          timeout 5m python src/shuzimiti/script.py || code=$?;
+          cd src/
+          timeout 5m python shuzimiti/script.py || code=$?;
           if [[ $code -ne 124 && $code -ne 0 ]];
             then exit $code;
           fi
