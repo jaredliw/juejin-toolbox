@@ -1,5 +1,6 @@
+from json import JSONDecodeError
+
 from requests import Session
-from requests.exceptions import JSONDecodeError
 
 from __init__ import JuejinError
 
