@@ -27,10 +27,10 @@ jobs:
       - name: Run script
         # Set step as succeeded on timeout
         run: |
-          cd src/
           timeout 5m python shuzimiti/script.py || code=$?;
           if [[ $code -ne 124 && $code -ne 0 ]];
             then exit $code;
           fi
         env:
+          PYTHONPATH: src/
           JUEJIN_SESSION_ID: ${{ secrets.JUEJIN_SESSION_ID }}

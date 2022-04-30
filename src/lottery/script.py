@@ -7,17 +7,15 @@ if __name__ == "__main__":
 
     lottery = Lottery(JuejinSession(session_id))
     lottery_config = lottery.get_config()
-    print(lottery_config)
     # You will get a free draw every day after check-in
     for _ in range(lottery_config["free_count"]):
         # By default, it only draw a lottery when it does not cost any points
         result = lottery.draw()
         print("You win a", result['lottery_name'])
-    print()
 
     lottery_history = lottery.get_history()["lotteries"]
     random_record = choice(lottery_history)["history_id"]
-    print(lottery.attract_luck(random_record))
+    lottery.attract_luck(random_record)
 
     luck = lottery.get_luck()["total_value"]
-    print(f"Your luck is {luck}. {'Claim your prize right now!' if luck >= 6000 else ''}")
+    print(f"\nYour luck is {luck}. {'Claim your prize right now!' if luck >= 6000 else ''}")
