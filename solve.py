@@ -68,15 +68,6 @@ def find_valid_calculations(puzzle: NumberPuzzle) \
 
 
 def bfs(puzzle: NumberPuzzle, val1, symbol, val2, second_try=False):
-    def _is_step_completed():
-        if operands is None:
-            return False
-        elif operands[1] in (0.3, 0.5):
-            if operands == (val1, symbol, val2) or operands == (val2, symbol, val1):
-                return True
-        else:
-            return operands == (val1, symbol, val2)
-
     def _get_pieces():
         if not second_try:
             return list(chain(puzzle.pieces[val1], puzzle.pieces[symbol], puzzle.pieces[val2]))
@@ -107,7 +98,7 @@ def bfs(puzzle: NumberPuzzle, val1, symbol, val2, second_try=False):
                     continue
 
                 if puzzle.zobrist_hash not in hashes:
-                    if _is_step_completed():
+                    if puzzle.is_solved():
                         return
                     hashes.add(puzzle.zobrist_hash)
                     to_do.append(puzzle.history[initial_history_length:])

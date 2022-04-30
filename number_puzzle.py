@@ -316,8 +316,8 @@ class NumberPuzzle:
         :return: state of the puzzle
         :rtype: bool
         """
-        keys = list(self.pieces.keys())
-        return len(keys) == 1 and keys[0] == self.target
+        keys = self.pieces.keys()
+        return len(keys) == 1 and next(iter(keys)) == self.target
 
     def reset(self) -> None:
         """Reset the puzzle to the initial, same as calling `undo` method infinite times.
