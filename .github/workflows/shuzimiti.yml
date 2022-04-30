@@ -2,7 +2,7 @@ name: ShuZiMiTi
 
 on:
   schedule:
-  - cron: 0 0 * * 0
+    - cron: 0 0 * * 0
   workflow_dispatch:
 
 jobs:
@@ -20,10 +20,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ];
+            then pip install -r requirements.txt;
+          fi
 
       - name: Run script
         # Set step as succeeded on timeout
-        run: timeout 5m python ./shuzimiti/script.py || code=$?; if [[ $code -ne 124 && $code -ne 0 ]]; then exit $code; fi
+        run: |
+          timeout 5m python src/shuzimiti/script.py || code=$?;
+          if [[ $code -ne 124 && $code -ne 0 ]];
+            then exit $code;
+          fi
         env:
           JUEJIN_SESSION_ID: ${{ secrets.JUEJIN_SESSION_ID }}

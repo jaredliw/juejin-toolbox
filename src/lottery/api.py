@@ -1,6 +1,6 @@
 from typing import Dict, List, Union
 
-from check_in.api import JuejinSession
+from src.check_in.api import JuejinSession
 
 
 class Lottery:
